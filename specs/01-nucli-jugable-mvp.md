@@ -1,6 +1,6 @@
 # 01 - Nucli jugable MVP
 
-**Estat:** Draft
+**Estat:** Approved
 **Depèn de:** (cap)
 **Data:** 2026-09-16
 
@@ -10,7 +10,7 @@
 
 **Dins de l'abast:**
 
-- Pantalla de joc amb canvas HTML5 a mida fixa.
+- Pantalla de joc amb canvas HTML5 a mida fixa de 800x600 px amb el fons negre.
 - Pala controlable amb teclat (fletxes esquerra/dreta o A/D) i amb ratolí (segueix la posició horitzontal del punter dins del canvas).
 - Pilota amb moviment continu i rebot físic contra les parets laterals, la paret superior i la pala (l'angle de rebot depèn del punt d'impacte sobre la pala).
 - Un únic nivell de blocs fix, en graella de files de colors (p. ex. 5 files x 8 columnes), cada fila amb un color de `SPRITES.blocks` (gray, red, yellow, cyan, magenta, hotpink, green), definit com a array/estructura fixa al codi.
