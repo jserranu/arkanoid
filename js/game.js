@@ -3,18 +3,23 @@ const CANVAS_HEIGHT = 600;
 
 const BLOCK_COLS = 8;
 const BLOCK_ROWS = 5;
-const BLOCK_WIDTH = 32;
-const BLOCK_HEIGHT = 16;
+const BLOCK_WIDTH = 44;
+const BLOCK_HEIGHT = 22;
 const BLOCK_GAP = 8;
 const BLOCK_TOP_MARGIN = 50;
 const ALL_BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const PADDLE_SPEED = 8;
+const PADDLE_WIDTH = 81;
 const POINTS_PER_BLOCK = 10;
 const INITIAL_LIVES = 3;
 const LIFE_ICON_SIZE = 16;
 const HUD_MARGIN = 16;
 const TOTAL_LEVELS = 5;
 const RESISTANT_BLOCKS_PER_LEVEL_STEP = 3;
+const BASE_BALL_SPEED_X = 4;
+const BASE_BALL_SPEED_Y = -4;
+const LEVEL_SPEED_INCREASE = 1.1;
+const LEVEL_PATTERNS = [ 'full', 'pyramid', 'checkerboard', 'diamond', 'stripes' ];
 
 let canvas;
 let ctx;
@@ -26,6 +31,7 @@ let gameState;
 let score;
 let lives;
 let currentLevel;
+let ballSpeedMultiplier;
 let muted = false;
 
 const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
@@ -43,9 +49,9 @@ let lastInput = 'keyboard';
 
 function resetPaddleAndBall() {
   paddle = {
-    x: CANVAS_WIDTH / 2 - 162 / 2,
+    x: CANVAS_WIDTH / 2 - PADDLE_WIDTH / 2,
     y: CANVAS_HEIGHT - 30,
-    width: 162,
+    width: PADDLE_WIDTH,
     height: 14,
   };
 
@@ -53,19 +59,45 @@ function resetPaddleAndBall() {
     x: CANVAS_WIDTH / 2,
     y: paddle.y - 8,
     radius: 8,
-    dx: 4,
-    dy: -4,
+    dx: BASE_BALL_SPEED_X * ballSpeedMultiplier,
+    dy: BASE_BALL_SPEED_Y * ballSpeedMultiplier,
   };
+}
+
+function isBlockPresentInPattern( pattern, row, col ) {
+  switch ( pattern ) {
+    case 'pyramid': {
+      const width = Math.min( BLOCK_COLS, 2 * row + 1 );
+      const start = Math.floor( ( BLOCK_COLS - width ) / 2 );
+      return col >= start && col < start + width;
+    }
+    case 'checkerboard':
+      return ( row + col ) % 2 === 0;
+    case 'diamond': {
+      const midRow = ( BLOCK_ROWS - 1 ) / 2;
+      const distanceFromMid = Math.abs( row - midRow );
+      const width = Math.max( 1, Math.round( BLOCK_COLS * ( 1 - distanceFromMid / ( midRow + 1 ) ) ) );
+      const start = Math.floor( ( BLOCK_COLS - width ) / 2 );
+      return col >= start && col < start + width;
+    }
+    case 'stripes':
+      return row % 2 === 0;
+    case 'full':
+    default:
+      return true;
+  }
 }
 
 function generateBlocksForLevel( level ) {
   const generatedBlocks = [];
   const gridWidth = BLOCK_COLS * BLOCK_WIDTH + ( BLOCK_COLS - 1 ) * BLOCK_GAP;
   const leftMargin = ( CANVAS_WIDTH - gridWidth ) / 2;
+  const pattern = LEVEL_PATTERNS[ ( level - 1 ) % LEVEL_PATTERNS.length ];
 
   for ( let row = 0; row < BLOCK_ROWS; row++ ) {
     const color = ALL_BLOCK_COLORS[ Math.floor( Math.random() * ALL_BLOCK_COLORS.length ) ];
     for ( let col = 0; col < BLOCK_COLS; col++ ) {
+      if ( !isBlockPresentInPattern( pattern, row, col ) ) continue;
       generatedBlocks.push( {
         x: leftMargin + col * ( BLOCK_WIDTH + BLOCK_GAP ),
         y: BLOCK_TOP_MARGIN + row * ( BLOCK_HEIGHT + BLOCK_GAP ),
@@ -92,12 +124,12 @@ function generateBlocksForLevel( level ) {
 }
 
 function createInitialState() {
-  resetPaddleAndBall();
-
   score = 0;
   lives = INITIAL_LIVES;
   currentLevel = 1;
+  ballSpeedMultiplier = 1;
 
+  resetPaddleAndBall();
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
 
@@ -106,6 +138,7 @@ function createInitialState() {
 
 function advanceToNextLevel() {
   currentLevel += 1;
+  ballSpeedMultiplier *= LEVEL_SPEED_INCREASE;
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
   resetPaddleAndBall();
