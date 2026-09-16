@@ -110,6 +110,38 @@ function checkPaddleCollision() {
   ball.y = paddle.y - ball.radius;
 }
 
+function ballOverlapsBlock( block ) {
+  return ball.x + ball.radius > block.x &&
+    ball.x - ball.radius < block.x + block.width &&
+    ball.y + ball.radius > block.y &&
+    ball.y - ball.radius < block.y + block.height;
+}
+
+function checkBlockCollisions() {
+  for ( const block of blocks ) {
+    if ( !block.alive ) continue;
+    if ( !ballOverlapsBlock( block ) ) continue;
+
+    block.alive = false;
+
+    const overlapLeft = ( ball.x + ball.radius ) - block.x;
+    const overlapRight = ( block.x + block.width ) - ( ball.x - ball.radius );
+    const overlapTop = ( ball.y + ball.radius ) - block.y;
+    const overlapBottom = ( block.y + block.height ) - ( ball.y - ball.radius );
+
+    const minOverlapX = Math.min( overlapLeft, overlapRight );
+    const minOverlapY = Math.min( overlapTop, overlapBottom );
+
+    if ( minOverlapX < minOverlapY ) {
+      ball.dx = -ball.dx;
+    } else {
+      ball.dy = -ball.dy;
+    }
+
+    break;
+  }
+}
+
 function updateBall() {
   ball.x += ball.dx;
   ball.y += ball.dy;
@@ -128,6 +160,7 @@ function updateBall() {
   }
 
   checkPaddleCollision();
+  checkBlockCollisions();
 }
 
 function update() {
