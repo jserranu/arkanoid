@@ -8,6 +8,7 @@ const BLOCK_HEIGHT = 16;
 const BLOCK_GAP = 8;
 const BLOCK_TOP_MARGIN = 50;
 const BLOCK_ROW_COLORS = [ 'red', 'yellow', 'green', 'cyan', 'magenta' ];
+const PADDLE_SPEED = 8;
 
 let canvas;
 let ctx;
@@ -15,6 +16,10 @@ let paddle;
 let ball;
 let blocks;
 let gameState;
+
+const keysPressed = {};
+let mouseX = null;
+let lastInput = 'keyboard';
 
 function createInitialState() {
   paddle = {
@@ -68,7 +73,31 @@ function drawBlocks() {
   }
 }
 
+function clampPaddleX( x ) {
+  return Math.max( 0, Math.min( CANVAS_WIDTH - paddle.width, x ) );
+}
+
+function updatePaddle() {
+  if ( lastInput === 'mouse' && mouseX !== null ) {
+    paddle.x = clampPaddleX( mouseX - paddle.width / 2 );
+    return;
+  }
+
+  if ( keysPressed[ 'ArrowLeft' ] || keysPressed[ 'a' ] || keysPressed[ 'A' ] ) {
+    paddle.x = clampPaddleX( paddle.x - PADDLE_SPEED );
+  }
+  if ( keysPressed[ 'ArrowRight' ] || keysPressed[ 'd' ] || keysPressed[ 'D' ] ) {
+    paddle.x = clampPaddleX( paddle.x + PADDLE_SPEED );
+  }
+}
+
+function update() {
+  updatePaddle();
+}
+
 function gameLoop() {
+  update();
+
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
 
   drawBlocks();
@@ -78,10 +107,28 @@ function gameLoop() {
   requestAnimationFrame( gameLoop );
 }
 
+function setupInput() {
+  window.addEventListener( 'keydown', ( e ) => {
+    keysPressed[ e.key ] = true;
+    lastInput = 'keyboard';
+  } );
+
+  window.addEventListener( 'keyup', ( e ) => {
+    keysPressed[ e.key ] = false;
+  } );
+
+  canvas.addEventListener( 'mousemove', ( e ) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    lastInput = 'mouse';
+  } );
+}
+
 function initGame() {
   canvas = document.getElementById( 'game' );
   ctx = canvas.getContext( '2d' );
 
   createInitialState();
+  setupInput();
   requestAnimationFrame( gameLoop );
 }
