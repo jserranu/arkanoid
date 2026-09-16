@@ -1,6 +1,6 @@
 # 01 - Nucli jugable MVP
 
-**Estat:** Approved
+**Estat:** Implemented
 **Depèn de:** (cap)
 **Data:** 2026-09-16
 
@@ -58,19 +58,19 @@ No es persisteix cap dada entre sessions. L'estat de joc viu només en memòria 
 
 ## Criteris d'acceptació
 
-- [ ] Obrir `index.html` al navegador mostra el canvas amb la pala, la pilota i la graella de blocs de colors, un cop l'spritesheet s'ha carregat.
-- [ ] La pala es mou horitzontalment amb les fletxes esquerra/dreta (o A/D) sense sortir dels límits del canvas.
-- [ ] La pala es mou horitzontalment seguint el ratolí quan aquest es mou sobre el canvas.
-- [ ] La pilota es mou de forma contínua i rebota contra les parets laterals i la paret superior.
-- [ ] La pilota rebota contra la pala amb un angle que depèn del punt d'impacte.
-- [ ] En col·lidir amb un bloc, el bloc desapareix del canvas i la pilota rebota.
-- [ ] Quan es destrueixen tots els blocs, apareix un missatge de victòria i la pilota deixa de moure's.
-- [ ] Quan la pilota surt per la part inferior i queden vides, es perd una vida (la icona corresponent desapareix de la cantonada superior dreta), la pala i la pilota es reposicionen al centre, i es mantenen els blocs destruïts i la puntuació.
-- [ ] Quan la pilota surt per la part inferior i no queden més vides, apareix un missatge de "Game Over" i la pilota deixa de moure's.
-- [ ] La puntuació es mostra a la cantonada superior esquerra i s'incrementa en 10 punts en destruir cada bloc.
-- [ ] Les vides es mostren a la cantonada superior dreta com a icones de pilota (mai com a número), començant amb 3.
-- [ ] Des de l'estat de victòria o derrota, prement Espai o Enter la partida es reinicia completament (blocs, pala, pilota, puntuació a 0 i vides a 3) sense recarregar la pàgina.
-- [ ] No hi ha cap so, power-up ni segon nivell implementats en aquest MVP.
+- [x] Obrir `index.html` al navegador mostra el canvas amb la pala, la pilota i la graella de blocs de colors, un cop l'spritesheet s'ha carregat.
+- [x] La pala es mou horitzontalment amb les fletxes esquerra/dreta (o A/D) sense sortir dels límits del canvas.
+- [x] La pala es mou horitzontalment seguint el ratolí quan aquest es mou sobre el canvas.
+- [x] La pilota es mou de forma contínua i rebota contra les parets laterals i la paret superior.
+- [x] La pilota rebota contra la pala amb un angle que depèn del punt d'impacte.
+- [x] En col·lidir amb un bloc, el bloc desapareix del canvas i la pilota rebota.
+- [x] Quan es destrueixen tots els blocs, apareix un missatge de victòria i la pilota deixa de moure's.
+- [x] Quan la pilota surt per la part inferior i queden vides, es perd una vida (la icona corresponent desapareix de la cantonada superior dreta), la pala i la pilota es reposicionen al centre, i es mantenen els blocs destruïts i la puntuació.
+- [x] Quan la pilota surt per la part inferior i no queden més vides, apareix un missatge de "Game Over" i la pilota deixa de moure's.
+- [x] La puntuació es mostra a la cantonada superior esquerra i s'incrementa en 10 punts en destruir cada bloc.
+- [x] Les vides es mostren a la cantonada superior dreta com a icones de pilota (mai com a número), començant amb 3.
+- [x] Des de l'estat de victòria o derrota, prement Espai o Enter la partida es reinicia completament (blocs, pala, pilota, puntuació a 0 i vides a 3) sense recarregar la pàgina.
+- [x] No hi ha cap so, power-up ni segon nivell implementats en aquest MVP.
 
 ## Decisions preses i descartades
 
