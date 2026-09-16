@@ -88,6 +88,17 @@ function drawBlocks() {
   }
 }
 
+function drawExplosions() {
+  const now = performance.now();
+  const frameDuration = EXPLOSION_DURATION / 4;
+
+  for ( const explosion of explosions ) {
+    const elapsed = now - explosion.startTime;
+    const frame = Math.min( 3, Math.floor( elapsed / frameDuration ) );
+    drawFrame( ctx, EXPLOSION_FRAMES[ explosion.color ][ frame ], explosion.x, explosion.y, explosion.width, explosion.height );
+  }
+}
+
 function clampPaddleX( x ) {
   return Math.max( 0, Math.min( CANVAS_WIDTH - paddle.width, x ) );
 }
@@ -258,6 +269,7 @@ function gameLoop() {
   ctx.clearRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
 
   drawBlocks();
+  drawExplosions();
   drawPaddle();
   drawBall();
   drawScore();
