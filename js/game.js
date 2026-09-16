@@ -142,6 +142,10 @@ function checkBlockCollisions() {
   }
 }
 
+function allBlocksDestroyed() {
+  return blocks.every( ( block ) => !block.alive );
+}
+
 function updateBall() {
   ball.x += ball.dx;
   ball.y += ball.dy;
@@ -161,11 +165,40 @@ function updateBall() {
 
   checkPaddleCollision();
   checkBlockCollisions();
+
+  if ( allBlocksDestroyed() ) {
+    gameState = 'won';
+    return;
+  }
+
+  if ( ball.y - ball.radius > CANVAS_HEIGHT ) {
+    gameState = 'lost';
+  }
 }
 
 function update() {
+  if ( gameState !== 'playing' ) return;
+
   updatePaddle();
   updateBall();
+}
+
+function drawOverlay() {
+  if ( gameState === 'playing' ) return;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 48px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const message = gameState === 'won' ? 'Has guanyat!' : 'Game Over';
+  ctx.fillText( message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20 );
+
+  ctx.font = '20px sans-serif';
+  ctx.fillText( 'Prem Espai o Enter per tornar a jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30 );
 }
 
 function gameLoop() {
@@ -176,6 +209,7 @@ function gameLoop() {
   drawBlocks();
   drawPaddle();
   drawBall();
+  drawOverlay();
 
   requestAnimationFrame( gameLoop );
 }
