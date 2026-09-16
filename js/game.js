@@ -218,6 +218,10 @@ function setupInput() {
   window.addEventListener( 'keydown', ( e ) => {
     keysPressed[ e.key ] = true;
     lastInput = 'keyboard';
+
+    if ( gameState !== 'playing' && ( e.key === ' ' || e.key === 'Enter' ) ) {
+      createInitialState();
+    }
   } );
 
   window.addEventListener( 'keyup', ( e ) => {
