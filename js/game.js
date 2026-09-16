@@ -91,6 +91,25 @@ function updatePaddle() {
   }
 }
 
+const PADDLE_MAX_BOUNCE_ANGLE = Math.PI / 3;
+
+function checkPaddleCollision() {
+  if ( ball.dy <= 0 ) return;
+  if ( ball.y + ball.radius < paddle.y ) return;
+  if ( ball.y - ball.radius > paddle.y + paddle.height ) return;
+  if ( ball.x + ball.radius < paddle.x || ball.x - ball.radius > paddle.x + paddle.width ) return;
+
+  const speed = Math.hypot( ball.dx, ball.dy );
+  const paddleCenter = paddle.x + paddle.width / 2;
+  const hitPos = ( ball.x - paddleCenter ) / ( paddle.width / 2 );
+  const clampedHitPos = Math.max( -1, Math.min( 1, hitPos ) );
+  const angle = clampedHitPos * PADDLE_MAX_BOUNCE_ANGLE;
+
+  ball.dx = speed * Math.sin( angle );
+  ball.dy = -speed * Math.cos( angle );
+  ball.y = paddle.y - ball.radius;
+}
+
 function updateBall() {
   ball.x += ball.dx;
   ball.y += ball.dy;
@@ -107,6 +126,8 @@ function updateBall() {
     ball.y = ball.radius;
     ball.dy = -ball.dy;
   }
+
+  checkPaddleCollision();
 }
 
 function update() {
