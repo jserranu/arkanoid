@@ -16,6 +16,11 @@ const LIFE_ICON_SIZE = 16;
 const HUD_MARGIN = 16;
 const TOTAL_LEVELS = 5;
 const RESISTANT_BLOCKS_PER_LEVEL_STEP = 3;
+const POWERUP_BLOCKS_PER_LEVEL = 3;
+const STAR_FALL_SPEED = 2;
+const STAR_SIZE = 16;
+const STAR_COLOR = '#ffeb3b';
+const DOUBLE_POINTS_MULTIPLIER = 2;
 const BASE_BALL_SPEED_X = 4;
 const BASE_BALL_SPEED_Y = -4;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -24,9 +29,10 @@ const LEVEL_PATTERNS = [ 'full', 'pyramid', 'checkerboard', 'diamond', 'stripes'
 let canvas;
 let ctx;
 let paddle;
-let ball;
+let balls;
 let blocks;
 let explosions;
+let stars;
 let gameState;
 let score;
 let lives;
@@ -55,13 +61,13 @@ function resetPaddleAndBall() {
     height: 14,
   };
 
-  ball = {
+  balls = [ {
     x: CANVAS_WIDTH / 2,
     y: paddle.y - 8,
     radius: 8,
     dx: BASE_BALL_SPEED_X * ballSpeedMultiplier,
     dy: BASE_BALL_SPEED_Y * ballSpeedMultiplier,
-  };
+  } ];
 }
 
 function isBlockPresentInPattern( pattern, row, col ) {
@@ -88,6 +94,15 @@ function isBlockPresentInPattern( pattern, row, col ) {
   }
 }
 
+function shuffledIndices( length ) {
+  const indices = Array.from( { length }, ( _, index ) => index );
+  for ( let i = indices.length - 1; i > 0; i-- ) {
+    const j = Math.floor( Math.random() * ( i + 1 ) );
+    [ indices[ i ], indices[ j ] ] = [ indices[ j ], indices[ i ] ];
+  }
+  return indices;
+}
+
 function generateBlocksForLevel( level ) {
   const generatedBlocks = [];
   const gridWidth = BLOCK_COLS * BLOCK_WIDTH + ( BLOCK_COLS - 1 ) * BLOCK_GAP;
@@ -106,18 +121,21 @@ function generateBlocksForLevel( level ) {
         color,
         alive: true,
         hitsRemaining: 1,
+        hasPowerUp: false,
       } );
     }
   }
 
   const resistantCount = Math.min( RESISTANT_BLOCKS_PER_LEVEL_STEP * ( level - 1 ), generatedBlocks.length );
-  const shuffledIndices = generatedBlocks.map( ( _, index ) => index );
-  for ( let i = shuffledIndices.length - 1; i > 0; i-- ) {
-    const j = Math.floor( Math.random() * ( i + 1 ) );
-    [ shuffledIndices[ i ], shuffledIndices[ j ] ] = [ shuffledIndices[ j ], shuffledIndices[ i ] ];
-  }
+  const resistantIndices = shuffledIndices( generatedBlocks.length );
   for ( let i = 0; i < resistantCount; i++ ) {
-    generatedBlocks[ shuffledIndices[ i ] ].hitsRemaining = 2;
+    generatedBlocks[ resistantIndices[ i ] ].hitsRemaining = 2;
+  }
+
+  const powerUpCount = Math.min( POWERUP_BLOCKS_PER_LEVEL, generatedBlocks.length );
+  const powerUpIndices = shuffledIndices( generatedBlocks.length );
+  for ( let i = 0; i < powerUpCount; i++ ) {
+    generatedBlocks[ powerUpIndices[ i ] ].hasPowerUp = true;
   }
 
   return generatedBlocks;
@@ -132,6 +150,7 @@ function createInitialState() {
   resetPaddleAndBall();
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
+  stars = [];
 
   gameState = 'playing';
 }
@@ -141,6 +160,7 @@ function advanceToNextLevel() {
   ballSpeedMultiplier *= LEVEL_SPEED_INCREASE;
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
+  stars = [];
   resetPaddleAndBall();
   gameState = 'playing';
 }
@@ -149,8 +169,10 @@ function drawPaddle() {
   drawSprite( ctx, 'paddle', paddle.x, paddle.y, paddle.width, paddle.height );
 }
 
-function drawBall() {
-  drawSprite( ctx, 'ball', ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2 );
+function drawBalls() {
+  for ( const ball of balls ) {
+    drawSprite( ctx, 'ball', ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2 );
+  }
 }
 
 function drawBlocks() {
@@ -176,6 +198,68 @@ function drawExplosions() {
   }
 }
 
+function drawStarShape( cx, cy, size ) {
+  const outerRadius = size / 2;
+  const innerRadius = outerRadius / 2.5;
+  const spikes = 5;
+  const step = Math.PI / spikes;
+  let rot = -Math.PI / 2;
+
+  ctx.beginPath();
+  ctx.moveTo( cx, cy - outerRadius );
+  for ( let i = 0; i < spikes; i++ ) {
+    rot += step;
+    ctx.lineTo( cx + Math.cos( rot ) * innerRadius, cy + Math.sin( rot ) * innerRadius );
+    rot += step;
+    ctx.lineTo( cx + Math.cos( rot ) * outerRadius, cy + Math.sin( rot ) * outerRadius );
+  }
+  ctx.closePath();
+
+  ctx.fillStyle = STAR_COLOR;
+  ctx.fill();
+}
+
+function drawStars() {
+  for ( const star of stars ) {
+    drawStarShape( star.x, star.y, STAR_SIZE );
+  }
+}
+
+function starOverlapsPaddle( star ) {
+  return star.x + STAR_SIZE / 2 > paddle.x &&
+    star.x - STAR_SIZE / 2 < paddle.x + paddle.width &&
+    star.y + STAR_SIZE / 2 > paddle.y &&
+    star.y - STAR_SIZE / 2 < paddle.y + paddle.height;
+}
+
+function updateStars() {
+  const remainingStars = [];
+
+  for ( const star of stars ) {
+    star.y += star.dy;
+
+    if ( star.y - STAR_SIZE / 2 > CANVAS_HEIGHT ) continue;
+
+    if ( starOverlapsPaddle( star ) ) {
+      if ( balls.length === 1 ) {
+        const existingBall = balls[ 0 ];
+        balls.push( {
+          x: existingBall.x,
+          y: existingBall.y,
+          radius: existingBall.radius,
+          dx: -existingBall.dx,
+          dy: existingBall.dy,
+        } );
+      }
+      continue;
+    }
+
+    remainingStars.push( star );
+  }
+
+  stars = remainingStars;
+}
+
 function clampPaddleX( x ) {
   return Math.max( 0, Math.min( CANVAS_WIDTH - paddle.width, x ) );
 }
@@ -196,7 +280,7 @@ function updatePaddle() {
 
 const PADDLE_MAX_BOUNCE_ANGLE = Math.PI / 3;
 
-function checkPaddleCollision() {
+function checkPaddleCollision( ball ) {
   if ( ball.dy <= 0 ) return;
   if ( ball.y + ball.radius < paddle.y ) return;
   if ( ball.y - ball.radius > paddle.y + paddle.height ) return;
@@ -215,23 +299,23 @@ function checkPaddleCollision() {
   ball.y = paddle.y - ball.radius;
 }
 
-function ballOverlapsBlock( block ) {
+function ballOverlapsBlock( ball, block ) {
   return ball.x + ball.radius > block.x &&
     ball.x - ball.radius < block.x + block.width &&
     ball.y + ball.radius > block.y &&
     ball.y - ball.radius < block.y + block.height;
 }
 
-function checkBlockCollisions() {
+function checkBlockCollisions( ball ) {
   for ( const block of blocks ) {
     if ( !block.alive ) continue;
-    if ( !ballOverlapsBlock( block ) ) continue;
+    if ( !ballOverlapsBlock( ball, block ) ) continue;
 
     block.hitsRemaining -= 1;
 
     if ( block.hitsRemaining <= 0 ) {
       block.alive = false;
-      score += POINTS_PER_BLOCK;
+      score += POINTS_PER_BLOCK * ( balls.length === 2 ? DOUBLE_POINTS_MULTIPLIER : 1 );
 
       explosions.push( {
         x: block.x,
@@ -241,6 +325,14 @@ function checkBlockCollisions() {
         color: block.color,
         startTime: performance.now(),
       } );
+
+      if ( block.hasPowerUp ) {
+        stars.push( {
+          x: block.x + block.width / 2,
+          y: block.y + block.height / 2,
+          dy: STAR_FALL_SPEED,
+        } );
+      }
 
       playSound( breakSoundAudio );
     } else {
@@ -269,35 +361,39 @@ function allBlocksDestroyed() {
   return blocks.every( ( block ) => !block.alive );
 }
 
-function updateBall() {
-  ball.x += ball.dx;
-  ball.y += ball.dy;
+function updateBalls() {
+  for ( const ball of [ ...balls ] ) {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
 
-  if ( ball.x - ball.radius <= 0 ) {
-    ball.x = ball.radius;
-    ball.dx = -ball.dx;
-    playSound( ballBounceAudio );
-  } else if ( ball.x + ball.radius >= CANVAS_WIDTH ) {
-    ball.x = CANVAS_WIDTH - ball.radius;
-    ball.dx = -ball.dx;
-    playSound( ballBounceAudio );
+    if ( ball.x - ball.radius <= 0 ) {
+      ball.x = ball.radius;
+      ball.dx = -ball.dx;
+      playSound( ballBounceAudio );
+    } else if ( ball.x + ball.radius >= CANVAS_WIDTH ) {
+      ball.x = CANVAS_WIDTH - ball.radius;
+      ball.dx = -ball.dx;
+      playSound( ballBounceAudio );
+    }
+
+    if ( ball.y - ball.radius <= 0 ) {
+      ball.y = ball.radius;
+      ball.dy = -ball.dy;
+      playSound( ballBounceAudio );
+    }
+
+    checkPaddleCollision( ball );
+    checkBlockCollisions( ball );
   }
-
-  if ( ball.y - ball.radius <= 0 ) {
-    ball.y = ball.radius;
-    ball.dy = -ball.dy;
-    playSound( ballBounceAudio );
-  }
-
-  checkPaddleCollision();
-  checkBlockCollisions();
 
   if ( allBlocksDestroyed() ) {
     gameState = currentLevel < TOTAL_LEVELS ? 'levelComplete' : 'won';
     return;
   }
 
-  if ( ball.y - ball.radius > CANVAS_HEIGHT ) {
+  balls = balls.filter( ( ball ) => ball.y - ball.radius <= CANVAS_HEIGHT );
+
+  if ( balls.length === 0 ) {
     lives -= 1;
     if ( lives <= 0 ) {
       gameState = 'lost';
@@ -316,8 +412,9 @@ function update() {
   if ( gameState !== 'playing' ) return;
 
   updatePaddle();
-  updateBall();
+  updateBalls();
   updateExplosions();
+  updateStars();
 }
 
 function drawScore() {
@@ -325,7 +422,13 @@ function drawScore() {
   ctx.font = '20px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText( `${ score }`, HUD_MARGIN, HUD_MARGIN );
+  const scoreText = `${ score }`;
+  ctx.fillText( scoreText, HUD_MARGIN, HUD_MARGIN );
+
+  if ( balls.length === 2 ) {
+    const scoreWidth = ctx.measureText( scoreText ).width;
+    drawStarShape( HUD_MARGIN + scoreWidth + STAR_SIZE / 2 + 10, HUD_MARGIN + 10, STAR_SIZE );
+  }
 
   ctx.font = '14px sans-serif';
   ctx.fillText( `Nivell ${ currentLevel }/${ TOTAL_LEVELS }`, HUD_MARGIN, HUD_MARGIN + 26 );
@@ -363,8 +466,13 @@ function drawOverlay() {
   }
   ctx.fillText( message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20 );
 
+  if ( gameState === 'won' || gameState === 'lost' ) {
+    ctx.font = '24px sans-serif';
+    ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20 );
+  }
+
   ctx.font = '20px sans-serif';
-  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30 );
+  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60 );
 }
 
 function gameLoop() {
@@ -374,8 +482,9 @@ function gameLoop() {
 
   drawBlocks();
   drawExplosions();
+  drawStars();
   drawPaddle();
-  drawBall();
+  drawBalls();
   drawScore();
   drawLives();
   drawOverlay();
