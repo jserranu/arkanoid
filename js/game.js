@@ -33,8 +33,8 @@ function createInitialState() {
     x: CANVAS_WIDTH / 2,
     y: paddle.y - 8,
     radius: 8,
-    dx: 0,
-    dy: 0,
+    dx: 4,
+    dy: -4,
   };
 
   blocks = [];
@@ -91,8 +91,27 @@ function updatePaddle() {
   }
 }
 
+function updateBall() {
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  if ( ball.x - ball.radius <= 0 ) {
+    ball.x = ball.radius;
+    ball.dx = -ball.dx;
+  } else if ( ball.x + ball.radius >= CANVAS_WIDTH ) {
+    ball.x = CANVAS_WIDTH - ball.radius;
+    ball.dx = -ball.dx;
+  }
+
+  if ( ball.y - ball.radius <= 0 ) {
+    ball.y = ball.radius;
+    ball.dy = -ball.dy;
+  }
+}
+
 function update() {
   updatePaddle();
+  updateBall();
 }
 
 function gameLoop() {
