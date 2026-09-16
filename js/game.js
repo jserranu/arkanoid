@@ -19,6 +19,7 @@ let ctx;
 let paddle;
 let ball;
 let blocks;
+let explosions;
 let gameState;
 let score;
 let lives;
@@ -51,6 +52,7 @@ function createInitialState() {
   lives = INITIAL_LIVES;
 
   blocks = [];
+  explosions = [];
   const gridWidth = BLOCK_COLS * BLOCK_WIDTH + ( BLOCK_COLS - 1 ) * BLOCK_GAP;
   const leftMargin = ( CANVAS_WIDTH - gridWidth ) / 2;
 
