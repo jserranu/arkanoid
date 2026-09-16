@@ -206,11 +206,17 @@ function updateBall() {
   }
 }
 
+function updateExplosions() {
+  const now = performance.now();
+  explosions = explosions.filter( ( explosion ) => now - explosion.startTime < EXPLOSION_DURATION );
+}
+
 function update() {
   if ( gameState !== 'playing' ) return;
 
   updatePaddle();
   updateBall();
+  updateExplosions();
 }
 
 function drawScore() {
