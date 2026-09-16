@@ -9,6 +9,10 @@ const BLOCK_GAP = 8;
 const BLOCK_TOP_MARGIN = 50;
 const BLOCK_ROW_COLORS = [ 'red', 'yellow', 'green', 'cyan', 'magenta' ];
 const PADDLE_SPEED = 8;
+const POINTS_PER_BLOCK = 10;
+const INITIAL_LIVES = 3;
+const LIFE_ICON_SIZE = 16;
+const HUD_MARGIN = 16;
 
 let canvas;
 let ctx;
@@ -16,12 +20,14 @@ let paddle;
 let ball;
 let blocks;
 let gameState;
+let score;
+let lives;
 
 const keysPressed = {};
 let mouseX = null;
 let lastInput = 'keyboard';
 
-function createInitialState() {
+function resetPaddleAndBall() {
   paddle = {
     x: CANVAS_WIDTH / 2 - 162 / 2,
     y: CANVAS_HEIGHT - 30,
@@ -36,6 +42,13 @@ function createInitialState() {
     dx: 4,
     dy: -4,
   };
+}
+
+function createInitialState() {
+  resetPaddleAndBall();
+
+  score = 0;
+  lives = INITIAL_LIVES;
 
   blocks = [];
   const gridWidth = BLOCK_COLS * BLOCK_WIDTH + ( BLOCK_COLS - 1 ) * BLOCK_GAP;
@@ -123,6 +136,7 @@ function checkBlockCollisions() {
     if ( !ballOverlapsBlock( block ) ) continue;
 
     block.alive = false;
+    score += POINTS_PER_BLOCK;
 
     const overlapLeft = ( ball.x + ball.radius ) - block.x;
     const overlapRight = ( block.x + block.width ) - ( ball.x - ball.radius );
@@ -172,7 +186,12 @@ function updateBall() {
   }
 
   if ( ball.y - ball.radius > CANVAS_HEIGHT ) {
-    gameState = 'lost';
+    lives -= 1;
+    if ( lives <= 0 ) {
+      gameState = 'lost';
+    } else {
+      resetPaddleAndBall();
+    }
   }
 }
 
@@ -181,6 +200,21 @@ function update() {
 
   updatePaddle();
   updateBall();
+}
+
+function drawScore() {
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText( `${ score }`, HUD_MARGIN, HUD_MARGIN );
+}
+
+function drawLives() {
+  for ( let i = 0; i < lives; i++ ) {
+    const x = CANVAS_WIDTH - HUD_MARGIN - ( i + 1 ) * ( LIFE_ICON_SIZE + 4 );
+    drawSprite( ctx, 'ball', x, HUD_MARGIN, LIFE_ICON_SIZE, LIFE_ICON_SIZE );
+  }
 }
 
 function drawOverlay() {
@@ -209,6 +243,8 @@ function gameLoop() {
   drawBlocks();
   drawPaddle();
   drawBall();
+  drawScore();
+  drawLives();
   drawOverlay();
 
   requestAnimationFrame( gameLoop );
