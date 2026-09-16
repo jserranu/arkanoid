@@ -140,6 +140,15 @@ function checkBlockCollisions() {
     block.alive = false;
     score += POINTS_PER_BLOCK;
 
+    explosions.push( {
+      x: block.x,
+      y: block.y,
+      width: block.width,
+      height: block.height,
+      color: block.color,
+      startTime: performance.now(),
+    } );
+
     const overlapLeft = ( ball.x + ball.radius ) - block.x;
     const overlapRight = ( block.x + block.width ) - ( ball.x - ball.radius );
     const overlapTop = ( ball.y + ball.radius ) - block.y;
