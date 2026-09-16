@@ -7,12 +7,14 @@ const BLOCK_WIDTH = 32;
 const BLOCK_HEIGHT = 16;
 const BLOCK_GAP = 8;
 const BLOCK_TOP_MARGIN = 50;
-const BLOCK_ROW_COLORS = [ 'red', 'yellow', 'green', 'cyan', 'magenta' ];
+const ALL_BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const PADDLE_SPEED = 8;
 const POINTS_PER_BLOCK = 10;
 const INITIAL_LIVES = 3;
 const LIFE_ICON_SIZE = 16;
 const HUD_MARGIN = 16;
+const TOTAL_LEVELS = 5;
+const RESISTANT_BLOCKS_PER_LEVEL_STEP = 3;
 
 let canvas;
 let ctx;
@@ -23,6 +25,17 @@ let explosions;
 let gameState;
 let score;
 let lives;
+let currentLevel;
+let muted = false;
+
+const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
+const breakSoundAudio = new Audio( 'assets/sounds/break-sound.mp3' );
+
+function playSound( baseAudio ) {
+  if ( muted ) return;
+  const instance = baseAudio.cloneNode();
+  instance.play().catch( () => {} );
+}
 
 const keysPressed = {};
 let mouseX = null;
@@ -45,31 +58,57 @@ function resetPaddleAndBall() {
   };
 }
 
-function createInitialState() {
-  resetPaddleAndBall();
-
-  score = 0;
-  lives = INITIAL_LIVES;
-
-  blocks = [];
-  explosions = [];
+function generateBlocksForLevel( level ) {
+  const generatedBlocks = [];
   const gridWidth = BLOCK_COLS * BLOCK_WIDTH + ( BLOCK_COLS - 1 ) * BLOCK_GAP;
   const leftMargin = ( CANVAS_WIDTH - gridWidth ) / 2;
 
   for ( let row = 0; row < BLOCK_ROWS; row++ ) {
-    const color = BLOCK_ROW_COLORS[ row ];
+    const color = ALL_BLOCK_COLORS[ Math.floor( Math.random() * ALL_BLOCK_COLORS.length ) ];
     for ( let col = 0; col < BLOCK_COLS; col++ ) {
-      blocks.push( {
+      generatedBlocks.push( {
         x: leftMargin + col * ( BLOCK_WIDTH + BLOCK_GAP ),
         y: BLOCK_TOP_MARGIN + row * ( BLOCK_HEIGHT + BLOCK_GAP ),
         width: BLOCK_WIDTH,
         height: BLOCK_HEIGHT,
         color,
         alive: true,
+        hitsRemaining: 1,
       } );
     }
   }
 
+  const resistantCount = Math.min( RESISTANT_BLOCKS_PER_LEVEL_STEP * ( level - 1 ), generatedBlocks.length );
+  const shuffledIndices = generatedBlocks.map( ( _, index ) => index );
+  for ( let i = shuffledIndices.length - 1; i > 0; i-- ) {
+    const j = Math.floor( Math.random() * ( i + 1 ) );
+    [ shuffledIndices[ i ], shuffledIndices[ j ] ] = [ shuffledIndices[ j ], shuffledIndices[ i ] ];
+  }
+  for ( let i = 0; i < resistantCount; i++ ) {
+    generatedBlocks[ shuffledIndices[ i ] ].hitsRemaining = 2;
+  }
+
+  return generatedBlocks;
+}
+
+function createInitialState() {
+  resetPaddleAndBall();
+
+  score = 0;
+  lives = INITIAL_LIVES;
+  currentLevel = 1;
+
+  blocks = generateBlocksForLevel( currentLevel );
+  explosions = [];
+
+  gameState = 'playing';
+}
+
+function advanceToNextLevel() {
+  currentLevel += 1;
+  blocks = generateBlocksForLevel( currentLevel );
+  explosions = [];
+  resetPaddleAndBall();
   gameState = 'playing';
 }
 
@@ -85,6 +124,11 @@ function drawBlocks() {
   for ( const block of blocks ) {
     if ( !block.alive ) continue;
     drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.width, block.height );
+    if ( block.hitsRemaining > 1 ) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.strokeRect( block.x, block.y, block.width, block.height );
+    }
   }
 }
 
@@ -125,6 +169,8 @@ function checkPaddleCollision() {
   if ( ball.y - ball.radius > paddle.y + paddle.height ) return;
   if ( ball.x + ball.radius < paddle.x || ball.x - ball.radius > paddle.x + paddle.width ) return;
 
+  playSound( ballBounceAudio );
+
   const speed = Math.hypot( ball.dx, ball.dy );
   const paddleCenter = paddle.x + paddle.width / 2;
   const hitPos = ( ball.x - paddleCenter ) / ( paddle.width / 2 );
@@ -148,17 +194,25 @@ function checkBlockCollisions() {
     if ( !block.alive ) continue;
     if ( !ballOverlapsBlock( block ) ) continue;
 
-    block.alive = false;
-    score += POINTS_PER_BLOCK;
+    block.hitsRemaining -= 1;
 
-    explosions.push( {
-      x: block.x,
-      y: block.y,
-      width: block.width,
-      height: block.height,
-      color: block.color,
-      startTime: performance.now(),
-    } );
+    if ( block.hitsRemaining <= 0 ) {
+      block.alive = false;
+      score += POINTS_PER_BLOCK;
+
+      explosions.push( {
+        x: block.x,
+        y: block.y,
+        width: block.width,
+        height: block.height,
+        color: block.color,
+        startTime: performance.now(),
+      } );
+
+      playSound( breakSoundAudio );
+    } else {
+      playSound( ballBounceAudio );
+    }
 
     const overlapLeft = ( ball.x + ball.radius ) - block.x;
     const overlapRight = ( block.x + block.width ) - ( ball.x - ball.radius );
@@ -189,21 +243,24 @@ function updateBall() {
   if ( ball.x - ball.radius <= 0 ) {
     ball.x = ball.radius;
     ball.dx = -ball.dx;
+    playSound( ballBounceAudio );
   } else if ( ball.x + ball.radius >= CANVAS_WIDTH ) {
     ball.x = CANVAS_WIDTH - ball.radius;
     ball.dx = -ball.dx;
+    playSound( ballBounceAudio );
   }
 
   if ( ball.y - ball.radius <= 0 ) {
     ball.y = ball.radius;
     ball.dy = -ball.dy;
+    playSound( ballBounceAudio );
   }
 
   checkPaddleCollision();
   checkBlockCollisions();
 
   if ( allBlocksDestroyed() ) {
-    gameState = 'won';
+    gameState = currentLevel < TOTAL_LEVELS ? 'levelComplete' : 'won';
     return;
   }
 
@@ -236,6 +293,9 @@ function drawScore() {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText( `${ score }`, HUD_MARGIN, HUD_MARGIN );
+
+  ctx.font = '14px sans-serif';
+  ctx.fillText( `Nivell ${ currentLevel }/${ TOTAL_LEVELS }`, HUD_MARGIN, HUD_MARGIN + 26 );
 }
 
 function drawLives() {
@@ -256,11 +316,22 @@ function drawOverlay() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const message = gameState === 'won' ? 'Has guanyat!' : 'Game Over';
+  let message;
+  let continueMessage;
+  if ( gameState === 'levelComplete' ) {
+    message = `Nivell ${ currentLevel } superat!`;
+    continueMessage = 'Prem Espai o Enter per continuar';
+  } else if ( gameState === 'won' ) {
+    message = 'Has guanyat el joc!';
+    continueMessage = 'Prem Espai o Enter per tornar a jugar';
+  } else {
+    message = 'Game Over';
+    continueMessage = 'Prem Espai o Enter per tornar a jugar';
+  }
   ctx.fillText( message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20 );
 
   ctx.font = '20px sans-serif';
-  ctx.fillText( 'Prem Espai o Enter per tornar a jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30 );
+  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30 );
 }
 
 function gameLoop() {
@@ -284,7 +355,13 @@ function setupInput() {
     keysPressed[ e.key ] = true;
     lastInput = 'keyboard';
 
-    if ( gameState !== 'playing' && ( e.key === ' ' || e.key === 'Enter' ) ) {
+    if ( e.key === 'm' || e.key === 'M' ) {
+      muted = !muted;
+    }
+
+    if ( gameState === 'levelComplete' && ( e.key === ' ' || e.key === 'Enter' ) ) {
+      advanceToNextLevel();
+    } else if ( ( gameState === 'won' || gameState === 'lost' ) && ( e.key === ' ' || e.key === 'Enter' ) ) {
       createInitialState();
     }
   } );
