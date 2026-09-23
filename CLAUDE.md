@@ -8,7 +8,18 @@ Respon sempre en català, tant a la conversa com als comentaris del codi i als m
 
 ## Estat del projecte
 
-Aquest és un joc estil Arkanoid/Breakout, actualment en un estat inicial (scaffold). Només existeixen els assets i el flux de treball d'specs — encara no hi ha codi de joc (ni punt d'entrada HTML/JS, ni carpeta `specs/`). El primer treball de funcionalitat hauria de passar per `/spec` per crear `specs/01-...md` abans d'escriure cap codi.
+Joc d'Arkanoid/Breakout jugable, amb quatre specs implementades (vegeu `specs/`). Punt d'entrada: `index.html`, lògica de joc a `js/game.js`.
+
+## Specs implementades
+
+Totes les specs de `specs/` estan en estat `Implemented`:
+
+1. **`01-nucli-jugable-mvp.md`** — nucli jugable: canvas 800x600, pala (teclat i ratolí), pilota amb rebot físic, un nivell fix de blocs (5x8), puntuació (10 punts/bloc), 3 vides, victòria/derrota, reinici amb Espai/Enter.
+2. **`02-animacio-explosio-blocs.md`** — animació d'explosió de 4 frames (`EXPLOSION_FRAMES`, 150 ms) en destruir un bloc, purament visual, no bloqueja cap mecànica.
+3. **`03-sons-i-sistema-de-nivells.md`** — sons de rebot i de trencament de bloc (tecla M per silenciar), 5 nivells amb graelles generades proceduralment (colors aleatoris per fila), blocs resistents (2 impactes) en nombre creixent per nivell (0/3/6/9/12), puntuació i vides acumulades entre nivells.
+4. **`04-powerup-estrella-doble-pilota.md`** — 3 blocs per nivell porten un power-up ocult; en destruir-los cau una estrella groga que, si la pala la captura, activa una segona pilota; amb 2 pilotes actives els blocs valen el doble de punts; perdre una de les dues pilotes no descompta vida.
+
+Per a properes funcionalitats, seguir el mateix flux: `/spec` per definir la spec a `specs/NN-slug.md`, marcar-la `Approved` manualment i després `/spec-impl NN-slug`.
 
 ## Stack
 
@@ -33,4 +44,4 @@ El comportament de creació de branques de `/spec-impl` es controla amb `specs/.
 
 ## Notes
 
-- Actualment no és un repositori git — caldrà fer `git init` abans que el pas de creació de branques del flux d'specs (`/spec-impl`) pugui funcionar.
+- El repositori ja està inicialitzat amb git; cada spec s'ha implementat en la seva pròpia branca `spec-NN-slug` seguint el flux `/spec-impl`.
