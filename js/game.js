@@ -21,6 +21,11 @@ const STAR_FALL_SPEED = 2;
 const STAR_SIZE = 16;
 const STAR_COLOR = '#ffeb3b';
 const DOUBLE_POINTS_MULTIPLIER = 2;
+const FIRE_POWERUP_BLOCKS_PER_LEVEL = 3;
+const FIRE_DURATION_FRAMES = 900;
+const FIRE_STAR_COLOR = '#e00f0c';
+const FIRE_BALL_COLOR = '#e00f0c';
+const FIRE_TRAIL_LENGTH = 8;
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -33,6 +38,9 @@ let balls;
 let blocks;
 let explosions;
 let stars;
+let fireStars;
+let fireModeActive;
+let fireModeFramesRemaining;
 let gameState;
 let score;
 let lives;
@@ -67,6 +75,7 @@ function resetPaddleAndBall() {
     radius: 8,
     dx: BASE_BALL_SPEED_X * ballSpeedMultiplier,
     dy: BASE_BALL_SPEED_Y * ballSpeedMultiplier,
+    trail: [],
   } ];
 }
 
@@ -122,6 +131,7 @@ function generateBlocksForLevel( level ) {
         alive: true,
         hitsRemaining: 1,
         hasPowerUp: false,
+        hasFirePowerUp: false,
       } );
     }
   }
@@ -138,6 +148,12 @@ function generateBlocksForLevel( level ) {
     generatedBlocks[ powerUpIndices[ i ] ].hasPowerUp = true;
   }
 
+  const firePowerUpCount = Math.min( FIRE_POWERUP_BLOCKS_PER_LEVEL, generatedBlocks.length );
+  const firePowerUpIndices = shuffledIndices( generatedBlocks.length );
+  for ( let i = 0; i < firePowerUpCount; i++ ) {
+    generatedBlocks[ firePowerUpIndices[ i ] ].hasFirePowerUp = true;
+  }
+
   return generatedBlocks;
 }
 
@@ -151,6 +167,9 @@ function createInitialState() {
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
   stars = [];
+  fireStars = [];
+  fireModeActive = false;
+  fireModeFramesRemaining = 0;
 
   gameState = 'playing';
 }
@@ -161,6 +180,9 @@ function advanceToNextLevel() {
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
   stars = [];
+  fireStars = [];
+  fireModeActive = false;
+  fireModeFramesRemaining = 0;
   resetPaddleAndBall();
   gameState = 'playing';
 }
@@ -171,7 +193,24 @@ function drawPaddle() {
 
 function drawBalls() {
   for ( const ball of balls ) {
-    drawSprite( ctx, 'ball', ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2 );
+    if ( fireModeActive ) {
+      for ( let i = 0; i < ball.trail.length; i++ ) {
+        const trailPoint = ball.trail[ i ];
+        ctx.globalAlpha = ( ( i + 1 ) / ball.trail.length ) * 0.5;
+        ctx.beginPath();
+        ctx.arc( trailPoint.x, trailPoint.y, ball.radius, 0, Math.PI * 2 );
+        ctx.fillStyle = FIRE_BALL_COLOR;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.beginPath();
+      ctx.arc( ball.x, ball.y, ball.radius, 0, Math.PI * 2 );
+      ctx.fillStyle = FIRE_BALL_COLOR;
+      ctx.fill();
+    } else {
+      drawSprite( ctx, 'ball', ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2 );
+    }
   }
 }
 
@@ -198,7 +237,7 @@ function drawExplosions() {
   }
 }
 
-function drawStarShape( cx, cy, size ) {
+function drawStarShape( cx, cy, size, color = STAR_COLOR ) {
   const outerRadius = size / 2;
   const innerRadius = outerRadius / 2.5;
   const spikes = 5;
@@ -215,13 +254,19 @@ function drawStarShape( cx, cy, size ) {
   }
   ctx.closePath();
 
-  ctx.fillStyle = STAR_COLOR;
+  ctx.fillStyle = color;
   ctx.fill();
 }
 
 function drawStars() {
   for ( const star of stars ) {
     drawStarShape( star.x, star.y, STAR_SIZE );
+  }
+}
+
+function drawFireStars() {
+  for ( const star of fireStars ) {
+    drawStarShape( star.x, star.y, STAR_SIZE, FIRE_STAR_COLOR );
   }
 }
 
@@ -249,6 +294,7 @@ function updateStars() {
           radius: existingBall.radius,
           dx: -existingBall.dx,
           dy: existingBall.dy,
+          trail: [],
         } );
       }
       continue;
@@ -258,6 +304,37 @@ function updateStars() {
   }
 
   stars = remainingStars;
+}
+
+function fireStarOverlapsPaddle( star ) {
+  return star.x + STAR_SIZE / 2 > paddle.x &&
+    star.x - STAR_SIZE / 2 < paddle.x + paddle.width &&
+    star.y + STAR_SIZE / 2 > paddle.y &&
+    star.y - STAR_SIZE / 2 < paddle.y + paddle.height;
+}
+
+function updateFireStars() {
+  const remainingFireStars = [];
+
+  for ( const star of fireStars ) {
+    star.y += star.dy;
+
+    if ( star.y - STAR_SIZE / 2 > CANVAS_HEIGHT ) continue;
+
+    if ( fireStarOverlapsPaddle( star ) ) {
+      if ( fireModeActive ) {
+        fireModeFramesRemaining += FIRE_DURATION_FRAMES;
+      } else {
+        fireModeActive = true;
+        fireModeFramesRemaining = FIRE_DURATION_FRAMES;
+      }
+      continue;
+    }
+
+    remainingFireStars.push( star );
+  }
+
+  fireStars = remainingFireStars;
 }
 
 function clampPaddleX( x ) {
@@ -306,35 +383,52 @@ function ballOverlapsBlock( ball, block ) {
     ball.y - ball.radius < block.y + block.height;
 }
 
+function destroyBlock( block ) {
+  block.alive = false;
+  score += POINTS_PER_BLOCK * ( balls.length === 2 ? DOUBLE_POINTS_MULTIPLIER : 1 );
+
+  explosions.push( {
+    x: block.x,
+    y: block.y,
+    width: block.width,
+    height: block.height,
+    color: block.color,
+    startTime: performance.now(),
+  } );
+
+  if ( block.hasPowerUp ) {
+    stars.push( {
+      x: block.x + block.width / 2,
+      y: block.y + block.height / 2,
+      dy: STAR_FALL_SPEED,
+    } );
+  }
+
+  if ( block.hasFirePowerUp ) {
+    fireStars.push( {
+      x: block.x + block.width / 2,
+      y: block.y + block.height / 2,
+      dy: STAR_FALL_SPEED,
+    } );
+  }
+
+  playSound( breakSoundAudio );
+}
+
 function checkBlockCollisions( ball ) {
   for ( const block of blocks ) {
     if ( !block.alive ) continue;
     if ( !ballOverlapsBlock( ball, block ) ) continue;
 
+    if ( fireModeActive ) {
+      destroyBlock( block );
+      break;
+    }
+
     block.hitsRemaining -= 1;
 
     if ( block.hitsRemaining <= 0 ) {
-      block.alive = false;
-      score += POINTS_PER_BLOCK * ( balls.length === 2 ? DOUBLE_POINTS_MULTIPLIER : 1 );
-
-      explosions.push( {
-        x: block.x,
-        y: block.y,
-        width: block.width,
-        height: block.height,
-        color: block.color,
-        startTime: performance.now(),
-      } );
-
-      if ( block.hasPowerUp ) {
-        stars.push( {
-          x: block.x + block.width / 2,
-          y: block.y + block.height / 2,
-          dy: STAR_FALL_SPEED,
-        } );
-      }
-
-      playSound( breakSoundAudio );
+      destroyBlock( block );
     } else {
       playSound( ballBounceAudio );
     }
@@ -365,6 +459,13 @@ function updateBalls() {
   for ( const ball of [ ...balls ] ) {
     ball.x += ball.dx;
     ball.y += ball.dy;
+
+    if ( fireModeActive ) {
+      ball.trail.push( { x: ball.x, y: ball.y } );
+      if ( ball.trail.length > FIRE_TRAIL_LENGTH ) {
+        ball.trail.shift();
+      }
+    }
 
     if ( ball.x - ball.radius <= 0 ) {
       ball.x = ball.radius;
@@ -415,6 +516,15 @@ function update() {
   updateBalls();
   updateExplosions();
   updateStars();
+  updateFireStars();
+
+  if ( fireModeActive ) {
+    fireModeFramesRemaining -= 1;
+    if ( fireModeFramesRemaining <= 0 ) {
+      fireModeActive = false;
+      balls.forEach( ( ball ) => { ball.trail = []; } );
+    }
+  }
 }
 
 function drawScore() {
@@ -425,9 +535,21 @@ function drawScore() {
   const scoreText = `${ score }`;
   ctx.fillText( scoreText, HUD_MARGIN, HUD_MARGIN );
 
+  const scoreWidth = ctx.measureText( scoreText ).width;
+  let indicatorX = HUD_MARGIN + scoreWidth + 10;
+
   if ( balls.length === 2 ) {
-    const scoreWidth = ctx.measureText( scoreText ).width;
-    drawStarShape( HUD_MARGIN + scoreWidth + STAR_SIZE / 2 + 10, HUD_MARGIN + 10, STAR_SIZE );
+    drawStarShape( indicatorX + STAR_SIZE / 2, HUD_MARGIN + 10, STAR_SIZE );
+    indicatorX += STAR_SIZE + 10;
+  }
+
+  if ( fireModeActive ) {
+    drawStarShape( indicatorX + STAR_SIZE / 2, HUD_MARGIN + 10, STAR_SIZE, FIRE_STAR_COLOR );
+    indicatorX += STAR_SIZE + 6;
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px sans-serif';
+    ctx.fillText( `${ Math.ceil( fireModeFramesRemaining / 60 ) }s`, indicatorX, HUD_MARGIN );
   }
 
   ctx.font = '14px sans-serif';
@@ -486,6 +608,7 @@ function gameLoop() {
   drawBlocks();
   drawExplosions();
   drawStars();
+  drawFireStars();
   drawPaddle();
   drawBalls();
   drawScore();
