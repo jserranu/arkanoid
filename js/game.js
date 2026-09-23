@@ -21,8 +21,8 @@ const STAR_FALL_SPEED = 2;
 const STAR_SIZE = 16;
 const STAR_COLOR = '#ffeb3b';
 const DOUBLE_POINTS_MULTIPLIER = 2;
-const BASE_BALL_SPEED_X = 4;
-const BASE_BALL_SPEED_Y = -4;
+const BASE_BALL_SPEED_X = 3.2;
+const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
 const LEVEL_PATTERNS = [ 'full', 'pyramid', 'checkerboard', 'diamond', 'stripes' ];
 
@@ -454,7 +454,10 @@ function drawOverlay() {
 
   let message;
   let continueMessage;
-  if ( gameState === 'levelComplete' ) {
+  if ( gameState === 'paused' ) {
+    message = 'PAUSA';
+    continueMessage = 'Prem Espai o Enter per continuar';
+  } else if ( gameState === 'levelComplete' ) {
     message = `Nivell ${ currentLevel } superat!`;
     continueMessage = 'Prem Espai o Enter per continuar';
   } else if ( gameState === 'won' ) {
@@ -505,6 +508,10 @@ function setupInput() {
       advanceToNextLevel();
     } else if ( ( gameState === 'won' || gameState === 'lost' ) && ( e.key === ' ' || e.key === 'Enter' ) ) {
       createInitialState();
+    } else if ( gameState === 'playing' && ( e.key === 'p' || e.key === 'P' || e.key === 'Escape' ) ) {
+      gameState = 'paused';
+    } else if ( gameState === 'paused' && ( e.key === ' ' || e.key === 'Enter' ) ) {
+      gameState = 'playing';
     }
   } );
 
