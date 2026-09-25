@@ -26,6 +26,11 @@ const FIRE_DURATION_FRAMES = 900;
 const FIRE_STAR_COLOR = '#e00f0c';
 const FIRE_BALL_COLOR = '#e00f0c';
 const FIRE_TRAIL_LENGTH = 8;
+const LIFE_POWERUP_BLOCKS_PER_LEVEL = 2;
+const LIFE_STAR_COLOR = '#43a047';
+const LIFE_STAR_ZIGZAG_MIN_AMPLITUDE = 20;
+const LIFE_STAR_ZIGZAG_MAX_AMPLITUDE = 50;
+const LIFE_STAR_ZIGZAG_SPEED = 0.05;
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -39,6 +44,7 @@ let blocks;
 let explosions;
 let stars;
 let fireStars;
+let lifeStars;
 let fireModeActive;
 let fireModeFramesRemaining;
 let gameState;
@@ -132,6 +138,7 @@ function generateBlocksForLevel( level ) {
         hitsRemaining: 1,
         hasPowerUp: false,
         hasFirePowerUp: false,
+        hasLifePowerUp: false,
       } );
     }
   }
@@ -154,6 +161,12 @@ function generateBlocksForLevel( level ) {
     generatedBlocks[ firePowerUpIndices[ i ] ].hasFirePowerUp = true;
   }
 
+  const lifePowerUpCount = Math.min( LIFE_POWERUP_BLOCKS_PER_LEVEL, generatedBlocks.length );
+  const lifePowerUpIndices = shuffledIndices( generatedBlocks.length );
+  for ( let i = 0; i < lifePowerUpCount; i++ ) {
+    generatedBlocks[ lifePowerUpIndices[ i ] ].hasLifePowerUp = true;
+  }
+
   return generatedBlocks;
 }
 
@@ -168,6 +181,7 @@ function createInitialState() {
   explosions = [];
   stars = [];
   fireStars = [];
+  lifeStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
 
@@ -181,6 +195,7 @@ function advanceToNextLevel() {
   explosions = [];
   stars = [];
   fireStars = [];
+  lifeStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
   resetPaddleAndBall();
@@ -270,6 +285,12 @@ function drawFireStars() {
   }
 }
 
+function drawLifeStars() {
+  for ( const star of lifeStars ) {
+    drawStarShape( star.x, star.y, STAR_SIZE, LIFE_STAR_COLOR );
+  }
+}
+
 function starOverlapsPaddle( star ) {
   return star.x + STAR_SIZE / 2 > paddle.x &&
     star.x - STAR_SIZE / 2 < paddle.x + paddle.width &&
@@ -335,6 +356,27 @@ function updateFireStars() {
   }
 
   fireStars = remainingFireStars;
+}
+
+function updateLifeStars() {
+  const remainingLifeStars = [];
+
+  for ( const star of lifeStars ) {
+    star.y += star.dy;
+    star.elapsed += 1;
+    star.x = star.baseX + star.amplitude * Math.sin( star.elapsed * LIFE_STAR_ZIGZAG_SPEED );
+
+    if ( star.y - STAR_SIZE / 2 > CANVAS_HEIGHT ) continue;
+
+    if ( starOverlapsPaddle( star ) ) {
+      lives += 1;
+      continue;
+    }
+
+    remainingLifeStars.push( star );
+  }
+
+  lifeStars = remainingLifeStars;
 }
 
 function clampPaddleX( x ) {
@@ -409,6 +451,20 @@ function destroyBlock( block ) {
       x: block.x + block.width / 2,
       y: block.y + block.height / 2,
       dy: STAR_FALL_SPEED,
+    } );
+  }
+
+  if ( block.hasLifePowerUp ) {
+    const baseX = block.x + block.width / 2;
+    const amplitude = LIFE_STAR_ZIGZAG_MIN_AMPLITUDE +
+      Math.random() * ( LIFE_STAR_ZIGZAG_MAX_AMPLITUDE - LIFE_STAR_ZIGZAG_MIN_AMPLITUDE );
+    lifeStars.push( {
+      x: baseX,
+      y: block.y + block.height / 2,
+      dy: STAR_FALL_SPEED,
+      baseX,
+      amplitude,
+      elapsed: 0,
     } );
   }
 
@@ -517,6 +573,7 @@ function update() {
   updateExplosions();
   updateStars();
   updateFireStars();
+  updateLifeStars();
 
   if ( fireModeActive ) {
     fireModeFramesRemaining -= 1;
@@ -609,6 +666,7 @@ function gameLoop() {
   drawExplosions();
   drawStars();
   drawFireStars();
+  drawLifeStars();
   drawPaddle();
   drawBalls();
   drawScore();
