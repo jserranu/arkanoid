@@ -26,11 +26,15 @@ const FIRE_DURATION_FRAMES = 900;
 const FIRE_STAR_COLOR = '#e00f0c';
 const FIRE_BALL_COLOR = '#e00f0c';
 const FIRE_TRAIL_LENGTH = 8;
-const LIFE_POWERUP_BLOCKS_PER_LEVEL = 2;
+const LIFE_POWERUP_BLOCKS_PER_LEVEL = 1;
 const LIFE_STAR_COLOR = '#43a047';
 const LIFE_STAR_ZIGZAG_MIN_AMPLITUDE = 20;
 const LIFE_STAR_ZIGZAG_MAX_AMPLITUDE = 50;
 const LIFE_STAR_ZIGZAG_SPEED = 0.05;
+const PLAYER_NAME_MAX_LENGTH = 10;
+const PLAYER_NAME_DEFAULT = 'ANÒNIM';
+const RANKING_MAX_ENTRIES = 10;
+const RANKING_STORAGE_KEY = 'arkanoid:ranking:v1';
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -53,6 +57,10 @@ let lives;
 let currentLevel;
 let ballSpeedMultiplier;
 let muted = false;
+let playerName = '';
+let nameInput = '';
+let ranking = [];
+let lastRankingEntry = null;
 
 const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
 const breakSoundAudio = new Audio( 'assets/sounds/break-sound.mp3' );
@@ -66,6 +74,51 @@ function playSound( baseAudio ) {
 const keysPressed = {};
 let mouseX = null;
 let lastInput = 'keyboard';
+
+function isValidRankingEntry( entry ) {
+  return entry !== null
+    && typeof entry === 'object'
+    && typeof entry.name === 'string'
+    && Number.isFinite( entry.score )
+    && Number.isFinite( entry.level )
+    && Number.isFinite( entry.date );
+}
+
+function loadRanking() {
+  ranking = [];
+  try {
+    const raw = localStorage.getItem( RANKING_STORAGE_KEY );
+    if ( !raw ) return;
+    const parsed = JSON.parse( raw );
+    if ( Array.isArray( parsed ) ) {
+      ranking = parsed.filter( isValidRankingEntry ).slice( 0, RANKING_MAX_ENTRIES );
+    }
+  } catch ( error ) {
+    ranking = [];
+  }
+}
+
+function saveRanking() {
+  try {
+    localStorage.setItem( RANKING_STORAGE_KEY, JSON.stringify( ranking ) );
+  } catch ( error ) {
+    // localStorage no disponible: el rànquing continua només en memòria
+  }
+}
+
+function addRankingEntry() {
+  const entry = {
+    name: playerName,
+    score,
+    level: currentLevel,
+    date: Date.now()
+  };
+  ranking.push( entry );
+  ranking.sort( ( a, b ) => b.score - a.score || a.date - b.date );
+  ranking = ranking.slice( 0, RANKING_MAX_ENTRIES );
+  lastRankingEntry = entry;
+  saveRanking();
+}
 
 function resetPaddleAndBall() {
   paddle = {
@@ -184,6 +237,7 @@ function createInitialState() {
   lifeStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
+  lastRankingEntry = null;
 
   gameState = 'playing';
 }
@@ -545,6 +599,7 @@ function updateBalls() {
 
   if ( allBlocksDestroyed() ) {
     gameState = currentLevel < TOTAL_LEVELS ? 'levelComplete' : 'won';
+    if ( gameState === 'won' ) addRankingEntry();
     return;
   }
 
@@ -554,6 +609,7 @@ function updateBalls() {
     lives -= 1;
     if ( lives <= 0 ) {
       gameState = 'lost';
+      addRankingEntry();
     } else {
       resetPaddleAndBall();
     }
@@ -620,11 +676,86 @@ function drawLives() {
   }
 }
 
+function drawNameScreen() {
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.font = 'bold 56px sans-serif';
+  ctx.fillText( 'ARKANOID', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100 );
+
+  ctx.font = '24px sans-serif';
+  ctx.fillText( 'Escriu el teu nom', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30 );
+
+  const cursorVisible = Math.floor( performance.now() / 500 ) % 2 === 0;
+  ctx.font = 'bold 36px monospace';
+  ctx.fillText( nameInput + ( cursorVisible ? '_' : ' ' ), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20 );
+
+  ctx.font = '16px sans-serif';
+  ctx.fillText( 'Prem Enter per començar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80 );
+}
+
+function drawRankingScreen( message, continueMessage ) {
+  const rowHeight = 30;
+  const tableTop = 150;
+  const columns = { position: 200, name: 250, score: 520, level: 600 };
+
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( message, CANVAS_WIDTH / 2, 50 );
+  ctx.font = '22px sans-serif';
+  ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, 95 );
+
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillStyle = '#aaa';
+  ctx.textAlign = 'right';
+  ctx.fillText( '#', columns.position, tableTop );
+  ctx.textAlign = 'left';
+  ctx.fillText( 'Nom', columns.name, tableTop );
+  ctx.textAlign = 'right';
+  ctx.fillText( 'Punts', columns.score, tableTop );
+  ctx.fillText( 'Nivell', columns.level, tableTop );
+
+  ctx.font = '18px monospace';
+  ranking.forEach( ( entry, index ) => {
+    const y = tableTop + ( index + 1 ) * rowHeight;
+    ctx.fillStyle = entry === lastRankingEntry ? '#ffeb3b' : '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText( `${ index + 1 }`, columns.position, y );
+    ctx.textAlign = 'left';
+    ctx.fillText( entry.name, columns.name, y );
+    ctx.textAlign = 'right';
+    ctx.fillText( `${ entry.score }`, columns.score, y );
+    ctx.fillText( `${ entry.level }`, columns.level, y );
+  } );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.font = '20px sans-serif';
+  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40 );
+}
+
 function drawOverlay() {
   if ( gameState === 'playing' ) return;
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  const darkOverlay = gameState === 'enterName' || gameState === 'won' || gameState === 'lost';
+  ctx.fillStyle = darkOverlay ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
+
+  if ( gameState === 'enterName' ) {
+    drawNameScreen();
+    return;
+  }
+
+  if ( gameState === 'won' || gameState === 'lost' ) {
+    drawRankingScreen(
+      gameState === 'won' ? 'Has guanyat el joc!' : 'Game Over',
+      'Prem Espai o Enter per tornar a jugar'
+    );
+    return;
+  }
 
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 48px sans-serif';
@@ -639,19 +770,8 @@ function drawOverlay() {
   } else if ( gameState === 'levelComplete' ) {
     message = `Nivell ${ currentLevel } superat!`;
     continueMessage = 'Prem Espai o Enter per continuar';
-  } else if ( gameState === 'won' ) {
-    message = 'Has guanyat el joc!';
-    continueMessage = 'Prem Espai o Enter per tornar a jugar';
-  } else {
-    message = 'Game Over';
-    continueMessage = 'Prem Espai o Enter per tornar a jugar';
   }
   ctx.fillText( message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20 );
-
-  if ( gameState === 'won' || gameState === 'lost' ) {
-    ctx.font = '24px sans-serif';
-    ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20 );
-  }
 
   ctx.font = '20px sans-serif';
   ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60 );
@@ -676,8 +796,33 @@ function gameLoop() {
   requestAnimationFrame( gameLoop );
 }
 
+function handleNameInput( e ) {
+  if ( e.key === 'Backspace' ) {
+    e.preventDefault();
+    nameInput = nameInput.slice( 0, -1 );
+  } else if ( e.key === 'Enter' ) {
+    e.preventDefault();
+    playerName = nameInput.trim() || PLAYER_NAME_DEFAULT;
+    gameState = 'playing';
+  } else if ( e.key === ' ' ) {
+    e.preventDefault();
+    if ( nameInput.length > 0 && nameInput.length < PLAYER_NAME_MAX_LENGTH ) {
+      nameInput += ' ';
+    }
+  } else if ( !e.ctrlKey && !e.metaKey && !e.altKey && /^[\p{L}\p{N}]$/u.test( e.key ) ) {
+    if ( nameInput.length < PLAYER_NAME_MAX_LENGTH ) {
+      nameInput += e.key;
+    }
+  }
+}
+
 function setupInput() {
   window.addEventListener( 'keydown', ( e ) => {
+    if ( gameState === 'enterName' ) {
+      handleNameInput( e );
+      return;
+    }
+
     keysPressed[ e.key ] = true;
     lastInput = 'keyboard';
 
@@ -711,7 +856,10 @@ function initGame() {
   canvas = document.getElementById( 'game' );
   ctx = canvas.getContext( '2d' );
 
+  loadRanking();
   createInitialState();
+  gameState = 'enterName';
+  nameInput = '';
   setupInput();
   requestAnimationFrame( gameLoop );
 }
