@@ -35,6 +35,11 @@ const PLAYER_NAME_MAX_LENGTH = 10;
 const PLAYER_NAME_DEFAULT = 'ANÒNIM';
 const RANKING_MAX_ENTRIES = 10;
 const RANKING_STORAGE_KEY = 'arkanoid:ranking:v1';
+const PLAYER_LIST_ROW_HEIGHT = 30;
+const PLAYER_LIST_LEFT = 470;
+const PLAYER_LIST_WIDTH = 300;
+const PLAYER_LIST_HEADER_Y = 150;
+const NEW_PLAYER_LABEL = 'Nou jugador';
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -61,6 +66,8 @@ let playerName = '';
 let nameInput = '';
 let ranking = [];
 let lastRankingEntry = null;
+let playerOptions = [];
+let selectedPlayerIndex = 0;
 
 const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
 const breakSoundAudio = new Audio( 'assets/sounds/break-sound.mp3' );
@@ -118,6 +125,35 @@ function addRankingEntry() {
   ranking = ranking.slice( 0, RANKING_MAX_ENTRIES );
   lastRankingEntry = entry;
   saveRanking();
+}
+
+function getPlayerOptions() {
+  return [ ...new Set( ranking.map( ( entry ) => entry.name ) ) ];
+}
+
+function enterSelectPlayer() {
+  playerOptions = getPlayerOptions();
+  selectedPlayerIndex = 0;
+  nameInput = '';
+  gameState = 'selectPlayer';
+}
+
+function getPlayerListRowAt( x, y ) {
+  if ( x < PLAYER_LIST_LEFT || x > PLAYER_LIST_LEFT + PLAYER_LIST_WIDTH ) return -1;
+  const firstRowTop = PLAYER_LIST_HEADER_Y + PLAYER_LIST_ROW_HEIGHT / 2;
+  const row = Math.floor( ( y - firstRowTop ) / PLAYER_LIST_ROW_HEIGHT );
+  return row >= 0 && row <= playerOptions.length ? row : -1;
+}
+
+function confirmPlayerSelection() {
+  if ( selectedPlayerIndex < playerOptions.length ) {
+    playerName = playerOptions[ selectedPlayerIndex ];
+    nameInput = '';
+    gameState = 'playing';
+  } else {
+    nameInput = '';
+    gameState = 'enterName';
+  }
 }
 
 function resetPaddleAndBall() {
@@ -693,21 +729,54 @@ function drawNameScreen() {
 
   ctx.font = '16px sans-serif';
   ctx.fillText( 'Prem Enter per començar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80 );
+  if ( ranking.length > 0 ) {
+    ctx.fillText( 'Esc per tornar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 108 );
+  }
 }
 
-function drawRankingScreen( message, continueMessage ) {
-  const rowHeight = 30;
-  const tableTop = 150;
-  const columns = { position: 200, name: 250, score: 520, level: 600 };
+function drawSelectPlayerScreen() {
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( 'ARKANOID', CANVAS_WIDTH / 2, 50 );
+  ctx.font = '22px sans-serif';
+  ctx.fillText( 'Tria jugador', CANVAS_WIDTH / 2, 95 );
 
   ctx.fillStyle = '#fff';
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 40px sans-serif';
-  ctx.fillText( message, CANVAS_WIDTH / 2, 50 );
-  ctx.font = '22px sans-serif';
-  ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, 95 );
+  drawRankingTable( 30 );
 
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillStyle = '#aaa';
+  ctx.textAlign = 'left';
+  ctx.fillText( 'Jugadors', PLAYER_LIST_LEFT, PLAYER_LIST_HEADER_Y );
+
+  ctx.font = '18px monospace';
+  for ( let i = 0; i <= playerOptions.length; i++ ) {
+    const isNewPlayer = i === playerOptions.length;
+    const y = PLAYER_LIST_HEADER_Y + ( i + 1 ) * PLAYER_LIST_ROW_HEIGHT;
+    const selected = i === selectedPlayerIndex;
+    if ( selected ) {
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
+      ctx.fillRect( PLAYER_LIST_LEFT - 8, y - PLAYER_LIST_ROW_HEIGHT / 2, PLAYER_LIST_WIDTH, PLAYER_LIST_ROW_HEIGHT );
+    }
+    ctx.fillStyle = selected ? '#ffeb3b' : ( isNewPlayer ? '#aaa' : '#fff' );
+    ctx.textAlign = 'left';
+    ctx.fillText( ( selected ? '> ' : '  ' ) + ( isNewPlayer ? NEW_PLAYER_LABEL : playerOptions[ i ] ), PLAYER_LIST_LEFT, y );
+  }
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.font = '16px sans-serif';
+  ctx.fillText( '↑↓ per triar · Enter o clic per jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40 );
+}
+
+function drawRankingTable( left ) {
+  const rowHeight = 30;
+  const tableTop = 150;
+  const columns = { position: left, name: left + 50, score: left + 320, level: left + 400 };
+
+  ctx.textBaseline = 'middle';
   ctx.font = 'bold 18px sans-serif';
   ctx.fillStyle = '#aaa';
   ctx.textAlign = 'right';
@@ -730,6 +799,18 @@ function drawRankingScreen( message, continueMessage ) {
     ctx.fillText( `${ entry.score }`, columns.score, y );
     ctx.fillText( `${ entry.level }`, columns.level, y );
   } );
+}
+
+function drawRankingScreen( message, continueMessage ) {
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( message, CANVAS_WIDTH / 2, 50 );
+  ctx.font = '22px sans-serif';
+  ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, 95 );
+
+  drawRankingTable( 200 );
 
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -740,9 +821,14 @@ function drawRankingScreen( message, continueMessage ) {
 function drawOverlay() {
   if ( gameState === 'playing' ) return;
 
-  const darkOverlay = gameState === 'enterName' || gameState === 'won' || gameState === 'lost';
+  const darkOverlay = gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'won' || gameState === 'lost';
   ctx.fillStyle = darkOverlay ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
+
+  if ( gameState === 'selectPlayer' ) {
+    drawSelectPlayerScreen();
+    return;
+  }
 
   if ( gameState === 'enterName' ) {
     drawNameScreen();
@@ -796,8 +882,24 @@ function gameLoop() {
   requestAnimationFrame( gameLoop );
 }
 
+function handleSelectPlayerInput( e ) {
+  const optionCount = playerOptions.length + 1;
+  if ( e.key === 'ArrowUp' ) {
+    e.preventDefault();
+    selectedPlayerIndex = ( selectedPlayerIndex - 1 + optionCount ) % optionCount;
+  } else if ( e.key === 'ArrowDown' ) {
+    e.preventDefault();
+    selectedPlayerIndex = ( selectedPlayerIndex + 1 ) % optionCount;
+  } else if ( e.key === 'Enter' ) {
+    e.preventDefault();
+    confirmPlayerSelection();
+  }
+}
+
 function handleNameInput( e ) {
-  if ( e.key === 'Backspace' ) {
+  if ( e.key === 'Escape' ) {
+    if ( ranking.length > 0 ) enterSelectPlayer();
+  } else if ( e.key === 'Backspace' ) {
     e.preventDefault();
     nameInput = nameInput.slice( 0, -1 );
   } else if ( e.key === 'Enter' ) {
@@ -816,8 +918,21 @@ function handleNameInput( e ) {
   }
 }
 
+function getCanvasCoordinates( e ) {
+  const rect = canvas.getBoundingClientRect();
+  return [
+    ( e.clientX - rect.left ) * canvas.width / rect.width,
+    ( e.clientY - rect.top ) * canvas.height / rect.height
+  ];
+}
+
 function setupInput() {
   window.addEventListener( 'keydown', ( e ) => {
+    if ( gameState === 'selectPlayer' ) {
+      handleSelectPlayerInput( e );
+      return;
+    }
+
     if ( gameState === 'enterName' ) {
       handleNameInput( e );
       return;
@@ -846,9 +961,22 @@ function setupInput() {
   } );
 
   canvas.addEventListener( 'mousemove', ( e ) => {
+    if ( gameState === 'selectPlayer' ) {
+      const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
+      if ( row !== -1 ) selectedPlayerIndex = row;
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     mouseX = e.clientX - rect.left;
     lastInput = 'mouse';
+  } );
+
+  canvas.addEventListener( 'click', ( e ) => {
+    if ( gameState !== 'selectPlayer' ) return;
+    const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
+    if ( row === -1 ) return;
+    selectedPlayerIndex = row;
+    confirmPlayerSelection();
   } );
 }
 
@@ -858,8 +986,12 @@ function initGame() {
 
   loadRanking();
   createInitialState();
-  gameState = 'enterName';
-  nameInput = '';
+  if ( ranking.length > 0 ) {
+    enterSelectPlayer();
+  } else {
+    gameState = 'enterName';
+    nameInput = '';
+  }
   setupInput();
   requestAnimationFrame( gameLoop );
 }
