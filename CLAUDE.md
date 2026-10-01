@@ -19,6 +19,10 @@ Totes les specs de `specs/` estan en estat `Implemented`:
 3. **`03-sons-i-sistema-de-nivells.md`** — sons de rebot i de trencament de bloc (tecla M per silenciar), 5 nivells amb graelles generades proceduralment (colors aleatoris per fila), blocs resistents (2 impactes) en nombre creixent per nivell (0/3/6/9/12), puntuació i vides acumulades entre nivells.
 4. **`04-powerup-estrella-doble-pilota.md`** — 3 blocs per nivell porten un power-up ocult; en destruir-los cau una estrella groga que, si la pala la captura, activa una segona pilota; amb 2 pilotes actives els blocs valen el doble de punts; perdre una de les dues pilotes no descompta vida.
 
+Millores posteriors (canvi directe, sense spec): la pilota s'accelera ×1.1 cada 30 s a partir dels 60 s de cada nivell (`updateLevelTimer`, comptador `levelFrames`; en perdre una vida la pilota torna a la velocitat base del nivell), i en superar un nivell s'atorga un bonus de temps de 200 punts menys 20 per cada 20 s (`calculateTimeBonus`), mostrat a la pantalla de nivell superat.
+
+Estrella blava (canvi directe, sense spec): 1 bloc per nivell la porta; en capturar-la durant 30 s la pilota va ×1.5 més ràpida i s'enganxa al centre de la pala en lloc de rebotar; Espai o clic de ratolí la dispara en línia recta cap amunt (`magnetModeActive`, `launchStuckBalls`). En perdre una vida o canviar de nivell l'efecte es cancel·la.
+
 Per a properes funcionalitats, seguir el mateix flux: `/spec` per definir la spec a `specs/NN-slug.md`, marcar-la `Approved` manualment i després `/spec-impl NN-slug`.
 
 ## Stack

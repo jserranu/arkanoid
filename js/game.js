@@ -26,6 +26,10 @@ const FIRE_DURATION_FRAMES = 900;
 const FIRE_STAR_COLOR = '#e00f0c';
 const FIRE_BALL_COLOR = '#e00f0c';
 const FIRE_TRAIL_LENGTH = 8;
+const MAGNET_POWERUP_BLOCKS_PER_LEVEL = 1;
+const MAGNET_DURATION_FRAMES = 1800;
+const MAGNET_STAR_COLOR = '#2196f3';
+const MAGNET_SPEED_MULTIPLIER = 1.5;
 const LIFE_POWERUP_BLOCKS_PER_LEVEL = 1;
 const LIFE_STAR_COLOR = '#43a047';
 const LIFE_STAR_ZIGZAG_MIN_AMPLITUDE = 20;
@@ -43,6 +47,13 @@ const NEW_PLAYER_LABEL = 'Nou jugador';
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
+const FRAMES_PER_SECOND = 60;
+const TIME_SPEED_START_FRAMES = 60 * FRAMES_PER_SECOND;
+const TIME_SPEED_INTERVAL_FRAMES = 30 * FRAMES_PER_SECOND;
+const TIME_SPEED_INCREASE = 1.1;
+const TIME_BONUS_MAX = 200;
+const TIME_BONUS_STEP_POINTS = 20;
+const TIME_BONUS_STEP_FRAMES = 20 * FRAMES_PER_SECOND;
 const LEVEL_PATTERNS = [ 'full', 'pyramid', 'checkerboard', 'diamond', 'stripes' ];
 
 let canvas;
@@ -54,13 +65,18 @@ let explosions;
 let stars;
 let fireStars;
 let lifeStars;
+let magnetStars;
 let fireModeActive;
 let fireModeFramesRemaining;
+let magnetModeActive;
+let magnetFramesRemaining;
 let gameState;
 let score;
 let lives;
 let currentLevel;
 let ballSpeedMultiplier;
+let levelFrames;
+let lastLevelBonus;
 let muted = false;
 let playerName = '';
 let nameInput = '';
@@ -114,6 +130,15 @@ function saveRanking() {
 }
 
 function addRankingEntry() {
+  const existingIndex = ranking.findIndex( ( item ) => item.name === playerName );
+  if ( existingIndex !== -1 ) {
+    if ( score <= ranking[ existingIndex ].score ) {
+      lastRankingEntry = null;
+      return;
+    }
+    ranking.splice( existingIndex, 1 );
+  }
+
   const entry = {
     name: playerName,
     score,
@@ -136,6 +161,15 @@ function enterSelectPlayer() {
   selectedPlayerIndex = 0;
   nameInput = '';
   gameState = 'selectPlayer';
+}
+
+function promptForPlayer() {
+  if ( ranking.length > 0 ) {
+    enterSelectPlayer();
+  } else {
+    gameState = 'enterName';
+    nameInput = '';
+  }
 }
 
 function getPlayerListRowAt( x, y ) {
@@ -171,7 +205,11 @@ function resetPaddleAndBall() {
     dx: BASE_BALL_SPEED_X * ballSpeedMultiplier,
     dy: BASE_BALL_SPEED_Y * ballSpeedMultiplier,
     trail: [],
+    stuck: false,
   } ];
+
+  magnetModeActive = false;
+  magnetFramesRemaining = 0;
 }
 
 function isBlockPresentInPattern( pattern, row, col ) {
@@ -228,6 +266,7 @@ function generateBlocksForLevel( level ) {
         hasPowerUp: false,
         hasFirePowerUp: false,
         hasLifePowerUp: false,
+        hasMagnetPowerUp: false,
       } );
     }
   }
@@ -256,6 +295,12 @@ function generateBlocksForLevel( level ) {
     generatedBlocks[ lifePowerUpIndices[ i ] ].hasLifePowerUp = true;
   }
 
+  const magnetPowerUpCount = Math.min( MAGNET_POWERUP_BLOCKS_PER_LEVEL, generatedBlocks.length );
+  const magnetPowerUpIndices = shuffledIndices( generatedBlocks.length );
+  for ( let i = 0; i < magnetPowerUpCount; i++ ) {
+    generatedBlocks[ magnetPowerUpIndices[ i ] ].hasMagnetPowerUp = true;
+  }
+
   return generatedBlocks;
 }
 
@@ -264,6 +309,8 @@ function createInitialState() {
   lives = INITIAL_LIVES;
   currentLevel = 1;
   ballSpeedMultiplier = 1;
+  levelFrames = 0;
+  lastLevelBonus = 0;
 
   resetPaddleAndBall();
   blocks = generateBlocksForLevel( currentLevel );
@@ -271,6 +318,7 @@ function createInitialState() {
   stars = [];
   fireStars = [];
   lifeStars = [];
+  magnetStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
   lastRankingEntry = null;
@@ -281,11 +329,13 @@ function createInitialState() {
 function advanceToNextLevel() {
   currentLevel += 1;
   ballSpeedMultiplier *= LEVEL_SPEED_INCREASE;
+  levelFrames = 0;
   blocks = generateBlocksForLevel( currentLevel );
   explosions = [];
   stars = [];
   fireStars = [];
   lifeStars = [];
+  magnetStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
   resetPaddleAndBall();
@@ -372,6 +422,12 @@ function drawStars() {
 function drawFireStars() {
   for ( const star of fireStars ) {
     drawStarShape( star.x, star.y, STAR_SIZE, FIRE_STAR_COLOR );
+  }
+}
+
+function drawMagnetStars() {
+  for ( const star of magnetStars ) {
+    drawStarShape( star.x, star.y, STAR_SIZE, MAGNET_STAR_COLOR );
   }
 }
 
@@ -469,6 +525,53 @@ function updateLifeStars() {
   lifeStars = remainingLifeStars;
 }
 
+function updateMagnetStars() {
+  const remainingMagnetStars = [];
+
+  for ( const star of magnetStars ) {
+    star.y += star.dy;
+
+    if ( star.y - STAR_SIZE / 2 > CANVAS_HEIGHT ) continue;
+
+    if ( starOverlapsPaddle( star ) ) {
+      if ( magnetModeActive ) {
+        magnetFramesRemaining += MAGNET_DURATION_FRAMES;
+      } else {
+        magnetModeActive = true;
+        magnetFramesRemaining = MAGNET_DURATION_FRAMES;
+        balls.forEach( ( ball ) => {
+          ball.dx *= MAGNET_SPEED_MULTIPLIER;
+          ball.dy *= MAGNET_SPEED_MULTIPLIER;
+        } );
+      }
+      continue;
+    }
+
+    remainingMagnetStars.push( star );
+  }
+
+  magnetStars = remainingMagnetStars;
+}
+
+function launchStuckBalls() {
+  for ( const ball of balls ) {
+    if ( !ball.stuck ) continue;
+    ball.dy = -Math.hypot( ball.dx, ball.dy );
+    ball.dx = 0;
+    ball.stuck = false;
+  }
+}
+
+function endMagnetMode() {
+  magnetModeActive = false;
+  magnetFramesRemaining = 0;
+  balls.forEach( ( ball ) => {
+    ball.dx /= MAGNET_SPEED_MULTIPLIER;
+    ball.dy /= MAGNET_SPEED_MULTIPLIER;
+  } );
+  launchStuckBalls();
+}
+
 function clampPaddleX( x ) {
   return Math.max( 0, Math.min( CANVAS_WIDTH - paddle.width, x ) );
 }
@@ -497,8 +600,17 @@ function checkPaddleCollision( ball ) {
 
   playSound( ballBounceAudio );
 
-  const speed = Math.hypot( ball.dx, ball.dy );
   const paddleCenter = paddle.x + paddle.width / 2;
+
+  if ( magnetModeActive ) {
+    ball.stuck = true;
+    ball.x = paddleCenter;
+    ball.y = paddle.y - ball.radius;
+    ball.trail = [];
+    return;
+  }
+
+  const speed = Math.hypot( ball.dx, ball.dy );
   const hitPos = ( ball.x - paddleCenter ) / ( paddle.width / 2 );
   const clampedHitPos = Math.max( -1, Math.min( 1, hitPos ) );
   const angle = clampedHitPos * PADDLE_MAX_BOUNCE_ANGLE;
@@ -538,6 +650,14 @@ function destroyBlock( block ) {
 
   if ( block.hasFirePowerUp ) {
     fireStars.push( {
+      x: block.x + block.width / 2,
+      y: block.y + block.height / 2,
+      dy: STAR_FALL_SPEED,
+    } );
+  }
+
+  if ( block.hasMagnetPowerUp ) {
+    magnetStars.push( {
       x: block.x + block.width / 2,
       y: block.y + block.height / 2,
       dy: STAR_FALL_SPEED,
@@ -601,8 +721,36 @@ function allBlocksDestroyed() {
   return blocks.every( ( block ) => !block.alive );
 }
 
+function calculateTimeBonus() {
+  const steps = Math.floor( levelFrames / TIME_BONUS_STEP_FRAMES );
+  return Math.max( 0, TIME_BONUS_MAX - steps * TIME_BONUS_STEP_POINTS );
+}
+
+function formatLevelTime( frames ) {
+  const totalSeconds = Math.floor( frames / FRAMES_PER_SECOND );
+  const seconds = totalSeconds % 60;
+  return `${ Math.floor( totalSeconds / 60 ) }:${ seconds < 10 ? '0' : '' }${ seconds }`;
+}
+
+function updateLevelTimer() {
+  levelFrames += 1;
+  if ( levelFrames >= TIME_SPEED_START_FRAMES &&
+       ( levelFrames - TIME_SPEED_START_FRAMES ) % TIME_SPEED_INTERVAL_FRAMES === 0 ) {
+    balls.forEach( ( ball ) => {
+      ball.dx *= TIME_SPEED_INCREASE;
+      ball.dy *= TIME_SPEED_INCREASE;
+    } );
+  }
+}
+
 function updateBalls() {
   for ( const ball of [ ...balls ] ) {
+    if ( ball.stuck ) {
+      ball.x = paddle.x + paddle.width / 2;
+      ball.y = paddle.y - ball.radius;
+      continue;
+    }
+
     ball.x += ball.dx;
     ball.y += ball.dy;
 
@@ -634,6 +782,8 @@ function updateBalls() {
   }
 
   if ( allBlocksDestroyed() ) {
+    lastLevelBonus = calculateTimeBonus();
+    score += lastLevelBonus;
     gameState = currentLevel < TOTAL_LEVELS ? 'levelComplete' : 'won';
     if ( gameState === 'won' ) addRankingEntry();
     return;
@@ -661,11 +811,20 @@ function update() {
   if ( gameState !== 'playing' ) return;
 
   updatePaddle();
+  updateLevelTimer();
   updateBalls();
   updateExplosions();
   updateStars();
   updateFireStars();
   updateLifeStars();
+  updateMagnetStars();
+
+  if ( magnetModeActive ) {
+    magnetFramesRemaining -= 1;
+    if ( magnetFramesRemaining <= 0 ) {
+      endMagnetMode();
+    }
+  }
 
   if ( fireModeActive ) {
     fireModeFramesRemaining -= 1;
@@ -701,8 +860,19 @@ function drawScore() {
     ctx.fillText( `${ Math.ceil( fireModeFramesRemaining / 60 ) }s`, indicatorX, HUD_MARGIN );
   }
 
+  if ( magnetModeActive ) {
+    drawStarShape( indicatorX + STAR_SIZE / 2, HUD_MARGIN + 10, STAR_SIZE, MAGNET_STAR_COLOR );
+    indicatorX += STAR_SIZE + 6;
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px sans-serif';
+    ctx.fillText( `${ Math.ceil( magnetFramesRemaining / FRAMES_PER_SECOND ) }s`, indicatorX, HUD_MARGIN );
+  }
+
+  ctx.fillStyle = '#fff';
   ctx.font = '14px sans-serif';
   ctx.fillText( `Nivell ${ currentLevel }/${ TOTAL_LEVELS }`, HUD_MARGIN, HUD_MARGIN + 26 );
+  ctx.fillText( `Bonus de temps: ${ calculateTimeBonus() }`, HUD_MARGIN, HUD_MARGIN + 44 );
 }
 
 function drawLives() {
@@ -809,6 +979,10 @@ function drawRankingScreen( message, continueMessage ) {
   ctx.fillText( message, CANVAS_WIDTH / 2, 50 );
   ctx.font = '22px sans-serif';
   ctx.fillText( `Puntuació: ${ score }`, CANVAS_WIDTH / 2, 95 );
+  if ( gameState === 'won' ) {
+    ctx.font = '16px sans-serif';
+    ctx.fillText( `Temps: ${ formatLevelTime( levelFrames ) } · Bonus de temps: +${ lastLevelBonus }`, CANVAS_WIDTH / 2, 122 );
+  }
 
   drawRankingTable( 200 );
 
@@ -859,8 +1033,13 @@ function drawOverlay() {
   }
   ctx.fillText( message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20 );
 
+  if ( gameState === 'levelComplete' ) {
+    ctx.font = '24px sans-serif';
+    ctx.fillText( `Temps: ${ formatLevelTime( levelFrames ) } · Bonus de temps: +${ lastLevelBonus }`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 25 );
+  }
+
   ctx.font = '20px sans-serif';
-  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60 );
+  ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70 );
 }
 
 function gameLoop() {
@@ -873,6 +1052,7 @@ function gameLoop() {
   drawStars();
   drawFireStars();
   drawLifeStars();
+  drawMagnetStars();
   drawPaddle();
   drawBalls();
   drawScore();
@@ -945,10 +1125,14 @@ function setupInput() {
       muted = !muted;
     }
 
-    if ( gameState === 'levelComplete' && ( e.key === ' ' || e.key === 'Enter' ) ) {
+    if ( gameState === 'playing' && e.key === ' ' ) {
+      e.preventDefault();
+      launchStuckBalls();
+    } else if ( gameState === 'levelComplete' && ( e.key === ' ' || e.key === 'Enter' ) ) {
       advanceToNextLevel();
     } else if ( ( gameState === 'won' || gameState === 'lost' ) && ( e.key === ' ' || e.key === 'Enter' ) ) {
       createInitialState();
+      promptForPlayer();
     } else if ( gameState === 'playing' && ( e.key === 'p' || e.key === 'P' || e.key === 'Escape' ) ) {
       gameState = 'paused';
     } else if ( gameState === 'paused' && ( e.key === ' ' || e.key === 'Enter' ) ) {
@@ -972,6 +1156,10 @@ function setupInput() {
   } );
 
   canvas.addEventListener( 'click', ( e ) => {
+    if ( gameState === 'playing' ) {
+      launchStuckBalls();
+      return;
+    }
     if ( gameState !== 'selectPlayer' ) return;
     const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
     if ( row === -1 ) return;
@@ -986,12 +1174,7 @@ function initGame() {
 
   loadRanking();
   createInitialState();
-  if ( ranking.length > 0 ) {
-    enterSelectPlayer();
-  } else {
-    gameState = 'enterName';
-    nameInput = '';
-  }
+  promptForPlayer();
   setupInput();
   requestAnimationFrame( gameLoop );
 }
