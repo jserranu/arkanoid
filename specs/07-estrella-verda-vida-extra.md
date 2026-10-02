@@ -1,6 +1,6 @@
 # 07 - Estrella verda: vida extra
 
-**Estat:** Approved
+**Estat:** Implemented
 **Depèn de:** SPEC 01, SPEC 03, SPEC 04, SPEC 06
 **Data:** 2026-09-23
 

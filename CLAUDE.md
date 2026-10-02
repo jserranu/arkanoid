@@ -8,18 +8,25 @@ Respon sempre en català, tant a la conversa com als comentaris del codi i als m
 
 ## Estat del projecte
 
-Joc d'Arkanoid/Breakout jugable, amb quatre specs implementades (vegeu `specs/`). Punt d'entrada: `index.html`, lògica de joc a `js/game.js`.
+Joc d'Arkanoid/Breakout jugable, amb nou specs implementades (vegeu `specs/`). Punt d'entrada: `index.html`, lògica de joc a `js/game.js`.
 
 ## Specs implementades
 
-Totes les specs de `specs/` estan en estat `Implemented`:
+Totes les specs de `specs/` (01-09) estan en estat `Implemented`:
 
 1. **`01-nucli-jugable-mvp.md`** — nucli jugable: canvas 800x600, pala (teclat i ratolí), pilota amb rebot físic, un nivell fix de blocs (5x8), puntuació (10 punts/bloc), 3 vides, victòria/derrota, reinici amb Espai/Enter.
 2. **`02-animacio-explosio-blocs.md`** — animació d'explosió de 4 frames (`EXPLOSION_FRAMES`, 150 ms) en destruir un bloc, purament visual, no bloqueja cap mecànica.
 3. **`03-sons-i-sistema-de-nivells.md`** — sons de rebot i de trencament de bloc (tecla M per silenciar), 5 nivells amb graelles generades proceduralment (colors aleatoris per fila), blocs resistents (2 impactes) en nombre creixent per nivell (0/3/6/9/12), puntuació i vides acumulades entre nivells.
 4. **`04-powerup-estrella-doble-pilota.md`** — 3 blocs per nivell porten un power-up ocult; en destruir-los cau una estrella groga que, si la pala la captura, activa una segona pilota; amb 2 pilotes actives els blocs valen el doble de punts; perdre una de les dues pilotes no descompta vida.
+5. **`05-pausa-i-velocitat-pilota.md`** — velocitat inicial de la pilota reduïda a 3.2 (`BASE_BALL_SPEED_X/Y`); pausa amb P o Escape (`gameState = 'paused'`, overlay "PAUSA") i represa amb Espai o Enter.
+6. **`06-estrella-vermella-pilota-de-foc.md`** — 3 blocs per nivell porten una estrella vermella; en capturar-la durant 15 s les pilotes són de foc: destrueixen qualsevol bloc d'un sol cop sense rebotar i deixen una estela vermella (`FIRE_DURATION_FRAMES`).
+7. **`07-estrella-verda-vida-extra.md`** — 1 bloc per nivell porta una estrella verda (cau fent zigzag) que, capturada, suma 1 vida (`LIFE_POWERUP_BLOCKS_PER_LEVEL`).
+8. **`08-nom-jugador-i-ranquing.md`** — pantalla inicial `enterName` per escriure el nom del jugador (màx. 10 caràcters, per defecte `ANÒNIM`) i rànquing Top 10 persistent a `localStorage` (`arkanoid:ranking:v1`), desat i mostrat en acabar la partida (victòria o derrota).
+9. **`09-ranquing-inicial-i-seleccio-jugador.md`** — la pantalla inicial (`selectPlayer`) mostra la taula de puntuacions i permet triar un jugador existent (fletxes amunt/avall + Enter, o ratolí) o crear-ne un de nou; Escape a `enterName` torna a la selecció.
 
 Millores posteriors (canvi directe, sense spec): la pilota s'accelera ×1.1 cada 30 s a partir dels 60 s de cada nivell (`updateLevelTimer`, comptador `levelFrames`; en perdre una vida la pilota torna a la velocitat base del nivell), i en superar un nivell s'atorga un bonus de temps de 200 punts menys 20 per cada 20 s (`calculateTimeBonus`), mostrat a la pantalla de nivell superat.
+
+Ampliació a 10 nivells (canvi directe, sense spec): `TOTAL_LEVELS = 11`, amb 5 patrons nous a `LEVEL_PATTERNS` (`invertedPyramid`, `frame`, `columns`, `zigzag`, `cross`) per als nivells 6-10 i el nivell 11 amb la forma "67" (`sixtySeven`, mapa de bits `SIXTY_SEVEN_BITMAP`); els blocs resistents continuen creixent 3 per nivell.
 
 Estrella blava (canvi directe, sense spec): 1 bloc per nivell la porta; en capturar-la durant 30 s la pilota va ×1.5 més ràpida i s'enganxa al centre de la pala en lloc de rebotar; Espai o clic de ratolí la dispara en línia recta cap amunt (`magnetModeActive`, `launchStuckBalls`). En perdre una vida o canviar de nivell l'efecte es cancel·la.
 

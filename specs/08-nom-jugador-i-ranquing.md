@@ -1,6 +1,6 @@
 # 08 - Nom del jugador i rànquing de puntuacions
 
-**Estat:** Approved
+**Estat:** Implemented
 **Depèn de:** SPEC 01, SPEC 03, SPEC 05
 **Data:** 2026-10-01
 

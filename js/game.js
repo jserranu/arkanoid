@@ -14,7 +14,7 @@ const POINTS_PER_BLOCK = 10;
 const INITIAL_LIVES = 3;
 const LIFE_ICON_SIZE = 16;
 const HUD_MARGIN = 16;
-const TOTAL_LEVELS = 5;
+const TOTAL_LEVELS = 11;
 const RESISTANT_BLOCKS_PER_LEVEL_STEP = 3;
 const POWERUP_BLOCKS_PER_LEVEL = 3;
 const STAR_FALL_SPEED = 2;
@@ -54,7 +54,20 @@ const TIME_SPEED_INCREASE = 1.1;
 const TIME_BONUS_MAX = 200;
 const TIME_BONUS_STEP_POINTS = 20;
 const TIME_BONUS_STEP_FRAMES = 20 * FRAMES_PER_SECOND;
-const LEVEL_PATTERNS = [ 'full', 'pyramid', 'checkerboard', 'diamond', 'stripes' ];
+const LEVEL_PATTERNS = [
+  'full', 'pyramid', 'checkerboard', 'diamond', 'stripes',
+  'invertedPyramid', 'frame', 'columns', 'zigzag', 'cross',
+  'sixtySeven',
+];
+
+// Mapa de bits (5 files x 8 columnes) amb les xifres "6" i "7"
+const SIXTY_SEVEN_BITMAP = [
+  '###..###',
+  '#......#',
+  '###....#',
+  '#.#....#',
+  '###....#',
+];
 
 let canvas;
 let ctx;
@@ -230,6 +243,24 @@ function isBlockPresentInPattern( pattern, row, col ) {
     }
     case 'stripes':
       return row % 2 === 0;
+    case 'invertedPyramid': {
+      const width = Math.min( BLOCK_COLS, 2 * ( BLOCK_ROWS - 1 - row ) + 1 );
+      const start = Math.floor( ( BLOCK_COLS - width ) / 2 );
+      return col >= start && col < start + width;
+    }
+    case 'frame':
+      return row === 0 || row === BLOCK_ROWS - 1 || col === 0 || col === BLOCK_COLS - 1;
+    case 'columns':
+      return col % 2 === 0;
+    case 'zigzag':
+      return ( col + ( Math.floor( col / 2 ) % 2 === 0 ? row : BLOCK_ROWS - 1 - row ) ) % 2 === 0 || row === 2;
+    case 'sixtySeven':
+      return SIXTY_SEVEN_BITMAP[ row ][ col ] === '#';
+    case 'cross': {
+      const midRow = Math.floor( BLOCK_ROWS / 2 );
+      const midCols = [ Math.floor( ( BLOCK_COLS - 1 ) / 2 ), Math.ceil( ( BLOCK_COLS - 1 ) / 2 ) ];
+      return row === midRow || midCols.includes( col );
+    }
     case 'full':
     default:
       return true;
