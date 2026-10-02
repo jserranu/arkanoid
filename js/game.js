@@ -54,6 +54,14 @@ const TIME_SPEED_INCREASE = 1.1;
 const TIME_BONUS_MAX = 200;
 const TIME_BONUS_STEP_POINTS = 20;
 const TIME_BONUS_STEP_FRAMES = 20 * FRAMES_PER_SECOND;
+const QUIZ_QUESTION_COUNT = 5;
+const QUIZ_TIME_FRAMES = 30 * FRAMES_PER_SECOND;
+const QUIZ_RESULT_LOCK_FRAMES = 30;
+const QUIZ_ANSWER_MAX_LENGTH = 2;
+const WIDE_PADDLE_FRAMES = 30 * FRAMES_PER_SECOND;
+const WIDE_PADDLE_FACTOR = 2;
+const SKILL_ICON_SIZE = 18;
+const SKILL_ICON_COLOR = '#ff9800';
 const LEVEL_PATTERNS = [
   'full', 'pyramid', 'checkerboard', 'diamond', 'stripes',
   'invertedPyramid', 'frame', 'columns', 'zigzag', 'cross',
@@ -83,6 +91,12 @@ let fireModeActive;
 let fireModeFramesRemaining;
 let magnetModeActive;
 let magnetFramesRemaining;
+let skillCount;
+let widePaddleActive;
+let widePaddleFramesRemaining;
+let levelTotalBlocks;
+let quizDoneThisLevel;
+let quiz = null;
 let gameState;
 let score;
 let lives;
@@ -223,6 +237,8 @@ function resetPaddleAndBall() {
 
   magnetModeActive = false;
   magnetFramesRemaining = 0;
+  widePaddleActive = false;
+  widePaddleFramesRemaining = 0;
 }
 
 function isBlockPresentInPattern( pattern, row, col ) {
@@ -335,6 +351,124 @@ function generateBlocksForLevel( level ) {
   return generatedBlocks;
 }
 
+function randomIntInclusive( min, max ) {
+  return min + Math.floor( Math.random() * ( max - min + 1 ) );
+}
+
+function generateQuizQuestion() {
+  if ( Math.random() < 0.5 ) {
+    const a = randomIntInclusive( 2, 9 );
+    const b = randomIntInclusive( 2, 9 );
+    return { text: `${ a } × ${ b }`, answer: a * b, given: null };
+  }
+
+  const divisor = randomIntInclusive( 2, 9 );
+  const quotient = randomIntInclusive( 2, Math.floor( 99 / divisor ) );
+  return { text: `${ divisor * quotient } ÷ ${ divisor }`, answer: quotient, given: null };
+}
+
+function generateQuizQuestions() {
+  const questions = [];
+  const usedTexts = new Set();
+  while ( questions.length < QUIZ_QUESTION_COUNT ) {
+    const question = generateQuizQuestion();
+    if ( usedTexts.has( question.text ) ) continue;
+    usedTexts.add( question.text );
+    questions.push( question );
+  }
+  return questions;
+}
+
+function countDestroyedBlocks() {
+  return blocks.filter( ( block ) => !block.alive ).length;
+}
+
+function shouldStartQuiz() {
+  return !quizDoneThisLevel && countDestroyedBlocks() >= Math.ceil( levelTotalBlocks / 2 );
+}
+
+function startQuiz() {
+  quiz = {
+    questions: generateQuizQuestions(),
+    index: 0,
+    input: '',
+    framesRemaining: QUIZ_TIME_FRAMES,
+    phase: 'answering',
+    success: false,
+    resultLockFrames: 0,
+  };
+  quizDoneThisLevel = true;
+  gameState = 'quiz';
+}
+
+function updateQuiz() {
+  if ( quiz.phase === 'result' ) {
+    if ( quiz.resultLockFrames > 0 ) quiz.resultLockFrames -= 1;
+    return;
+  }
+
+  quiz.framesRemaining -= 1;
+  if ( quiz.framesRemaining <= 0 ) {
+    finishQuiz();
+  }
+}
+
+function finishQuiz() {
+  quiz.success = quiz.questions.every( ( question ) => question.given === question.answer );
+
+  if ( quiz.success ) {
+    skillCount += 1;
+    quiz.skillDelta = 1;
+  } else if ( skillCount > 0 ) {
+    skillCount -= 1;
+    quiz.skillDelta = -1;
+  } else {
+    quiz.skillDelta = 0;
+  }
+
+  quiz.phase = 'result';
+  quiz.resultLockFrames = QUIZ_RESULT_LOCK_FRAMES;
+}
+
+function resumeAfterQuiz() {
+  quiz = null;
+  gameState = 'playing';
+}
+
+function submitQuizAnswer() {
+  if ( quiz.input === '' ) return;
+
+  quiz.questions[ quiz.index ].given = Number( quiz.input );
+  quiz.input = '';
+  quiz.index += 1;
+
+  if ( quiz.index >= QUIZ_QUESTION_COUNT ) {
+    finishQuiz();
+  }
+}
+
+function handleQuizInput( e ) {
+  if ( quiz.phase === 'result' ) {
+    if ( e.key === 'Enter' || e.key === ' ' ) {
+      e.preventDefault();
+      if ( !e.repeat && quiz.resultLockFrames <= 0 ) resumeAfterQuiz();
+    }
+    return;
+  }
+
+  if ( e.key === 'Backspace' ) {
+    e.preventDefault();
+    quiz.input = quiz.input.slice( 0, -1 );
+  } else if ( e.key === 'Enter' || e.key === ' ' ) {
+    e.preventDefault();
+    if ( !e.repeat ) submitQuizAnswer();
+  } else if ( !e.ctrlKey && !e.metaKey && !e.altKey && /^[0-9]$/.test( e.key ) ) {
+    if ( quiz.input.length < QUIZ_ANSWER_MAX_LENGTH ) {
+      quiz.input += e.key;
+    }
+  }
+}
+
 function createInitialState() {
   score = 0;
   lives = INITIAL_LIVES;
@@ -342,6 +476,7 @@ function createInitialState() {
   ballSpeedMultiplier = 1;
   levelFrames = 0;
   lastLevelBonus = 0;
+  skillCount = 0;
 
   resetPaddleAndBall();
   blocks = generateBlocksForLevel( currentLevel );
@@ -353,6 +488,9 @@ function createInitialState() {
   fireModeActive = false;
   fireModeFramesRemaining = 0;
   lastRankingEntry = null;
+  levelTotalBlocks = blocks.length;
+  quizDoneThisLevel = false;
+  quiz = null;
 
   gameState = 'playing';
 }
@@ -369,6 +507,9 @@ function advanceToNextLevel() {
   magnetStars = [];
   fireModeActive = false;
   fireModeFramesRemaining = 0;
+  levelTotalBlocks = blocks.length;
+  quizDoneThisLevel = false;
+  quiz = null;
   resetPaddleAndBall();
   gameState = 'playing';
 }
@@ -607,6 +748,26 @@ function clampPaddleX( x ) {
   return Math.max( 0, Math.min( CANVAS_WIDTH - paddle.width, x ) );
 }
 
+function setPaddleWidthKeepingCenter( width ) {
+  const center = paddle.x + paddle.width / 2;
+  paddle.width = width;
+  paddle.x = clampPaddleX( center - width / 2 );
+}
+
+function activateWidePaddle() {
+  if ( widePaddleActive || skillCount <= 0 ) return;
+  skillCount -= 1;
+  widePaddleActive = true;
+  widePaddleFramesRemaining = WIDE_PADDLE_FRAMES;
+  setPaddleWidthKeepingCenter( PADDLE_WIDTH * WIDE_PADDLE_FACTOR );
+}
+
+function endWidePaddle() {
+  widePaddleActive = false;
+  widePaddleFramesRemaining = 0;
+  setPaddleWidthKeepingCenter( PADDLE_WIDTH );
+}
+
 function updatePaddle() {
   if ( lastInput === 'mouse' && mouseX !== null ) {
     paddle.x = clampPaddleX( mouseX - paddle.width / 2 );
@@ -820,6 +981,11 @@ function updateBalls() {
     return;
   }
 
+  if ( shouldStartQuiz() ) {
+    startQuiz();
+    return;
+  }
+
   balls = balls.filter( ( ball ) => ball.y - ball.radius <= CANVAS_HEIGHT );
 
   if ( balls.length === 0 ) {
@@ -839,6 +1005,10 @@ function updateExplosions() {
 }
 
 function update() {
+  if ( gameState === 'quiz' ) {
+    updateQuiz();
+    return;
+  }
   if ( gameState !== 'playing' ) return;
 
   updatePaddle();
@@ -857,6 +1027,13 @@ function update() {
     }
   }
 
+  if ( widePaddleActive ) {
+    widePaddleFramesRemaining -= 1;
+    if ( widePaddleFramesRemaining <= 0 ) {
+      endWidePaddle();
+    }
+  }
+
   if ( fireModeActive ) {
     fireModeFramesRemaining -= 1;
     if ( fireModeFramesRemaining <= 0 ) {
@@ -864,6 +1041,31 @@ function update() {
       balls.forEach( ( ball ) => { ball.trail = []; } );
     }
   }
+}
+
+function drawSkillsHud( x, y ) {
+  ctx.fillStyle = SKILL_ICON_COLOR;
+  ctx.fillRect( x, y, SKILL_ICON_SIZE, SKILL_ICON_SIZE );
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText( 'V', x + SKILL_ICON_SIZE / 2, y + SKILL_ICON_SIZE / 2 + 1 );
+
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'left';
+  const countText = `${ skillCount }`;
+  const countX = x + SKILL_ICON_SIZE + 6;
+  ctx.fillText( countText, countX, y + SKILL_ICON_SIZE / 2 + 1 );
+
+  if ( widePaddleActive ) {
+    const countWidth = ctx.measureText( countText ).width;
+    const seconds = Math.ceil( widePaddleFramesRemaining / FRAMES_PER_SECOND );
+    ctx.fillText( `(${ seconds }s)`, countX + countWidth + 6, y + SKILL_ICON_SIZE / 2 + 1 );
+  }
+
+  ctx.textBaseline = 'top';
 }
 
 function drawScore() {
@@ -888,7 +1090,9 @@ function drawScore() {
 
     ctx.fillStyle = '#fff';
     ctx.font = '20px sans-serif';
-    ctx.fillText( `${ Math.ceil( fireModeFramesRemaining / 60 ) }s`, indicatorX, HUD_MARGIN );
+    const fireText = `${ Math.ceil( fireModeFramesRemaining / FRAMES_PER_SECOND ) }s`;
+    ctx.fillText( fireText, indicatorX, HUD_MARGIN );
+    indicatorX += ctx.measureText( fireText ).width + 10;
   }
 
   if ( magnetModeActive ) {
@@ -897,13 +1101,16 @@ function drawScore() {
 
     ctx.fillStyle = '#fff';
     ctx.font = '20px sans-serif';
-    ctx.fillText( `${ Math.ceil( magnetFramesRemaining / FRAMES_PER_SECOND ) }s`, indicatorX, HUD_MARGIN );
+    const magnetText = `${ Math.ceil( magnetFramesRemaining / FRAMES_PER_SECOND ) }s`;
+    ctx.fillText( magnetText, indicatorX, HUD_MARGIN );
+    indicatorX += ctx.measureText( magnetText ).width + 10;
   }
 
   ctx.fillStyle = '#fff';
   ctx.font = '14px sans-serif';
   ctx.fillText( `Nivell ${ currentLevel }/${ TOTAL_LEVELS }`, HUD_MARGIN, HUD_MARGIN + 26 );
   ctx.fillText( `Bonus de temps: ${ calculateTimeBonus() }`, HUD_MARGIN, HUD_MARGIN + 44 );
+  drawSkillsHud( HUD_MARGIN, HUD_MARGIN + 62 );
 }
 
 function drawLives() {
@@ -933,6 +1140,82 @@ function drawNameScreen() {
   if ( ranking.length > 0 ) {
     ctx.fillText( 'Esc per tornar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 108 );
   }
+}
+
+function getQuizResultMessage() {
+  if ( quiz.success ) return 'Correcte! +1 habilitat';
+  return quiz.skillDelta < 0 ? 'Error! −1 habilitat' : 'Error! Sense habilitats per perdre';
+}
+
+function drawQuizResultScreen() {
+  const centerX = CANVAS_WIDTH / 2;
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( 'Qüestionari', centerX, 100 );
+
+  ctx.fillStyle = quiz.success ? '#66bb6a' : '#ff5252';
+  ctx.font = 'bold 32px sans-serif';
+  ctx.fillText( getQuizResultMessage(), centerX, 160 );
+
+  ctx.font = '28px monospace';
+  quiz.questions.forEach( ( question, i ) => {
+    const correct = question.given === question.answer;
+    const given = question.given === null ? '—' : question.given;
+    const y = 230 + i * 40;
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText( `${ question.text } = ${ given }`, centerX + 80, y );
+
+    ctx.fillStyle = correct ? '#66bb6a' : '#ff5252';
+    ctx.textAlign = 'left';
+    ctx.fillText( correct ? '✓' : '✗', centerX + 110, y );
+  } );
+
+  if ( quiz.resultLockFrames <= 0 ) {
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = '20px sans-serif';
+    ctx.fillText( 'Prem Espai o Enter per continuar', centerX, CANVAS_HEIGHT - 50 );
+  }
+}
+
+function drawQuizScreen() {
+  if ( quiz.phase === 'result' ) {
+    drawQuizResultScreen();
+    return;
+  }
+
+  const centerX = CANVAS_WIDTH / 2;
+  const seconds = Math.ceil( quiz.framesRemaining / FRAMES_PER_SECOND );
+  const question = quiz.questions[ quiz.index ];
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( 'Qüestionari', centerX, 100 );
+
+  ctx.font = '22px sans-serif';
+  ctx.fillText( `Pregunta ${ quiz.index + 1 }/${ QUIZ_QUESTION_COUNT }`, centerX, 160 );
+
+  ctx.fillStyle = seconds <= 10 ? '#ff5252' : '#fff';
+  ctx.fillText( `Temps: ${ seconds }s`, centerX, 195 );
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 64px monospace';
+  ctx.fillText( `${ question.text } =`, centerX, 290 );
+
+  const cursorVisible = Math.floor( performance.now() / 500 ) % 2 === 0;
+  ctx.font = 'bold 48px monospace';
+  ctx.fillText( quiz.input + ( cursorVisible ? '_' : ' ' ), centerX, 370 );
+
+  ctx.font = '16px sans-serif';
+  ctx.fillText( 'Escriu la resposta i prem Enter o Espai', centerX, 450 );
 }
 
 function drawSelectPlayerScreen() {
@@ -1026,7 +1309,7 @@ function drawRankingScreen( message, continueMessage ) {
 function drawOverlay() {
   if ( gameState === 'playing' ) return;
 
-  const darkOverlay = gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'won' || gameState === 'lost';
+  const darkOverlay = gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'quiz' || gameState === 'won' || gameState === 'lost';
   ctx.fillStyle = darkOverlay ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
 
@@ -1037,6 +1320,11 @@ function drawOverlay() {
 
   if ( gameState === 'enterName' ) {
     drawNameScreen();
+    return;
+  }
+
+  if ( gameState === 'quiz' ) {
+    drawQuizScreen();
     return;
   }
 
@@ -1149,6 +1437,11 @@ function setupInput() {
       return;
     }
 
+    if ( gameState === 'quiz' ) {
+      handleQuizInput( e );
+      return;
+    }
+
     keysPressed[ e.key ] = true;
     lastInput = 'keyboard';
 
@@ -1159,6 +1452,8 @@ function setupInput() {
     if ( gameState === 'playing' && e.key === ' ' ) {
       e.preventDefault();
       launchStuckBalls();
+    } else if ( gameState === 'playing' && ( e.key === 'v' || e.key === 'V' ) && !e.repeat ) {
+      activateWidePaddle();
     } else if ( gameState === 'levelComplete' && ( e.key === ' ' || e.key === 'Enter' ) ) {
       advanceToNextLevel();
     } else if ( ( gameState === 'won' || gameState === 'lost' ) && ( e.key === ' ' || e.key === 'Enter' ) ) {
