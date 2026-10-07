@@ -44,6 +44,14 @@ const PLAYER_LIST_LEFT = 470;
 const PLAYER_LIST_WIDTH = 300;
 const PLAYER_LIST_HEADER_Y = 150;
 const NEW_PLAYER_LABEL = 'Nou jugador';
+const GAMES = [
+  { id: 'arkanoid', label: 'Arkanoid', url: null },
+  { id: 'properament', label: 'Properament', url: 'games/properament/index.html' }
+];
+const GAME_LIST_ROW_HEIGHT = 40;
+const GAME_LIST_TOP = 220;
+const GAME_LIST_WIDTH = 300;
+const GAMES_BUTTON = { x: 664, y: 44, width: 120, height: 36, label: 'Jocs' };
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
 const LEVEL_SPEED_INCREASE = 1.1;
@@ -111,6 +119,8 @@ let ranking = [];
 let lastRankingEntry = null;
 let playerOptions = [];
 let selectedPlayerIndex = 0;
+let selectedGameIndex = 0;
+let gamesButtonHovered = false;
 
 const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
 const breakSoundAudio = new Audio( 'assets/sounds/break-sound.mp3' );
@@ -204,6 +214,44 @@ function getPlayerListRowAt( x, y ) {
   const firstRowTop = PLAYER_LIST_HEADER_Y + PLAYER_LIST_ROW_HEIGHT / 2;
   const row = Math.floor( ( y - firstRowTop ) / PLAYER_LIST_ROW_HEIGHT );
   return row >= 0 && row <= playerOptions.length ? row : -1;
+}
+
+function enterSelectGame() {
+  selectedGameIndex = 0;
+  gameState = 'selectGame';
+}
+
+// GAME_LIST_TOP és la y del centre de la primera fila; la llista està centrada horitzontalment
+function getGameListRowAt( x, y ) {
+  const left = ( CANVAS_WIDTH - GAME_LIST_WIDTH ) / 2;
+  if ( x < left || x > left + GAME_LIST_WIDTH ) return -1;
+  const row = Math.floor( ( y - GAME_LIST_TOP + GAME_LIST_ROW_HEIGHT / 2 ) / GAME_LIST_ROW_HEIGHT );
+  return row >= 0 && row < GAMES.length ? row : -1;
+}
+
+function confirmGameSelection() {
+  const game = GAMES[ selectedGameIndex ];
+  if ( game.url === null ) {
+    promptForPlayer();
+  } else {
+    window.location.href = game.url;
+  }
+}
+
+function isGamesButtonVisible() {
+  return gameState === 'paused' || gameState === 'won' || gameState === 'lost';
+}
+
+// Abandona la partida en curs (no es desa al rànquing) i torna al selector de jocs
+function returnToGameSelector() {
+  createInitialState();
+  gamesButtonHovered = false;
+  enterSelectGame();
+}
+
+function isOverGamesButton( x, y ) {
+  return x >= GAMES_BUTTON.x && x <= GAMES_BUTTON.x + GAMES_BUTTON.width &&
+    y >= GAMES_BUTTON.y && y <= GAMES_BUTTON.y + GAMES_BUTTON.height;
 }
 
 function confirmPlayerSelection() {
@@ -1218,6 +1266,45 @@ function drawQuizScreen() {
   ctx.fillText( 'Escriu la resposta i prem Enter o Espai', centerX, 450 );
 }
 
+function drawSelectGameScreen() {
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 40px sans-serif';
+  ctx.fillText( 'Tria un joc', CANVAS_WIDTH / 2, 120 );
+
+  const left = ( CANVAS_WIDTH - GAME_LIST_WIDTH ) / 2;
+  ctx.font = '22px sans-serif';
+  for ( let i = 0; i < GAMES.length; i++ ) {
+    const y = GAME_LIST_TOP + i * GAME_LIST_ROW_HEIGHT;
+    const selected = i === selectedGameIndex;
+    if ( selected ) {
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
+      ctx.fillRect( left, y - GAME_LIST_ROW_HEIGHT / 2, GAME_LIST_WIDTH, GAME_LIST_ROW_HEIGHT );
+    }
+    ctx.fillStyle = selected ? '#ffeb3b' : '#fff';
+    ctx.fillText( GAMES[ i ].label, CANVAS_WIDTH / 2, y );
+  }
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px sans-serif';
+  ctx.fillText( '↑↓ per triar · Enter per jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40 );
+}
+
+function drawGamesButton() {
+  const { x, y, width, height, label } = GAMES_BUTTON;
+  ctx.fillStyle = gamesButtonHovered ? 'rgba(255, 235, 59, 0.2)' : 'rgba(255, 255, 255, 0.1)';
+  ctx.fillRect( x, y, width, height );
+  ctx.strokeStyle = gamesButtonHovered ? '#ffeb3b' : '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect( x, y, width, height );
+  ctx.fillStyle = gamesButtonHovered ? '#ffeb3b' : '#fff';
+  ctx.font = '20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText( label, x + width / 2, y + height / 2 );
+}
+
 function drawSelectPlayerScreen() {
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -1309,9 +1396,14 @@ function drawRankingScreen( message, continueMessage ) {
 function drawOverlay() {
   if ( gameState === 'playing' ) return;
 
-  const darkOverlay = gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'quiz' || gameState === 'won' || gameState === 'lost';
+  const darkOverlay = gameState === 'selectGame' || gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'quiz' || gameState === 'won' || gameState === 'lost';
   ctx.fillStyle = darkOverlay ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
+
+  if ( gameState === 'selectGame' ) {
+    drawSelectGameScreen();
+    return;
+  }
 
   if ( gameState === 'selectPlayer' ) {
     drawSelectPlayerScreen();
@@ -1333,6 +1425,7 @@ function drawOverlay() {
       gameState === 'won' ? 'Has guanyat el joc!' : 'Game Over',
       'Prem Espai o Enter per tornar a jugar'
     );
+    drawGamesButton();
     return;
   }
 
@@ -1359,6 +1452,8 @@ function drawOverlay() {
 
   ctx.font = '20px sans-serif';
   ctx.fillText( continueMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70 );
+
+  if ( gameState === 'paused' ) drawGamesButton();
 }
 
 function gameLoop() {
@@ -1379,6 +1474,19 @@ function gameLoop() {
   drawOverlay();
 
   requestAnimationFrame( gameLoop );
+}
+
+function handleSelectGameInput( e ) {
+  if ( e.key === 'ArrowUp' ) {
+    e.preventDefault();
+    selectedGameIndex = ( selectedGameIndex - 1 + GAMES.length ) % GAMES.length;
+  } else if ( e.key === 'ArrowDown' ) {
+    e.preventDefault();
+    selectedGameIndex = ( selectedGameIndex + 1 ) % GAMES.length;
+  } else if ( e.key === 'Enter' ) {
+    e.preventDefault();
+    confirmGameSelection();
+  }
 }
 
 function handleSelectPlayerInput( e ) {
@@ -1427,6 +1535,11 @@ function getCanvasCoordinates( e ) {
 
 function setupInput() {
   window.addEventListener( 'keydown', ( e ) => {
+    if ( gameState === 'selectGame' ) {
+      handleSelectGameInput( e );
+      return;
+    }
+
     if ( gameState === 'selectPlayer' ) {
       handleSelectPlayerInput( e );
       return;
@@ -1471,11 +1584,17 @@ function setupInput() {
   } );
 
   canvas.addEventListener( 'mousemove', ( e ) => {
+    if ( gameState === 'selectGame' ) {
+      const row = getGameListRowAt( ...getCanvasCoordinates( e ) );
+      if ( row !== -1 ) selectedGameIndex = row;
+      return;
+    }
     if ( gameState === 'selectPlayer' ) {
       const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
       if ( row !== -1 ) selectedPlayerIndex = row;
       return;
     }
+    gamesButtonHovered = isGamesButtonVisible() && isOverGamesButton( ...getCanvasCoordinates( e ) );
     const rect = canvas.getBoundingClientRect();
     mouseX = e.clientX - rect.left;
     lastInput = 'mouse';
@@ -1484,6 +1603,17 @@ function setupInput() {
   canvas.addEventListener( 'click', ( e ) => {
     if ( gameState === 'playing' ) {
       launchStuckBalls();
+      return;
+    }
+    if ( gameState === 'selectGame' ) {
+      const gameRow = getGameListRowAt( ...getCanvasCoordinates( e ) );
+      if ( gameRow === -1 ) return;
+      selectedGameIndex = gameRow;
+      confirmGameSelection();
+      return;
+    }
+    if ( isGamesButtonVisible() ) {
+      if ( isOverGamesButton( ...getCanvasCoordinates( e ) ) ) returnToGameSelector();
       return;
     }
     if ( gameState !== 'selectPlayer' ) return;
@@ -1500,7 +1630,7 @@ function initGame() {
 
   loadRanking();
   createInitialState();
-  promptForPlayer();
+  enterSelectGame();
   setupInput();
   requestAnimationFrame( gameLoop );
 }
