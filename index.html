@@ -2,30 +2,81 @@
 <html lang="ca">
 <head>
   <meta charset="UTF-8">
-  <title>Arkanoid</title>
+  <title>Jocs</title>
   <style>
     body {
       margin: 0;
       background: #222;
+      color: #fff;
+      font-family: sans-serif;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
     }
-    canvas {
-      background: #000;
+    h1 {
+      font-size: 40px;
+    }
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      width: 300px;
+    }
+    a {
+      display: block;
+      padding: 8px 0;
+      color: #fff;
+      font-size: 22px;
+      text-align: center;
+      text-decoration: none;
+      outline: none;
+    }
+    a:focus {
+      color: #ffeb3b;
+      background: rgba(255, 235, 59, 0.2);
+    }
+    p {
+      margin-top: 40px;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <canvas id="game" width="800" height="600"></canvas>
+  <h1>Tria un joc</h1>
+  <ul id="games"></ul>
+  <p>↑↓ per triar · Enter per jugar</p>
 
-  <script src="assets/spritesheet.js"></script>
-  <script src="js/game.js"></script>
   <script>
-    loadSpritesheet( () => {
-      initGame();
+    const GAMES = [
+      { id: 'arkanoid', label: 'Arkanoid' },
+      { id: 'properament', label: 'Properament' }
+    ];
+
+    const list = document.getElementById( 'games' );
+    const links = GAMES.map( ( game ) => {
+      const link = document.createElement( 'a' );
+      link.href = `games/${ game.id }/index.html`;
+      link.textContent = game.label;
+      // el ratolí mou el focus, de manera que només hi ha una fila ressaltada
+      link.addEventListener( 'mouseenter', () => link.focus() );
+      const item = document.createElement( 'li' );
+      item.appendChild( link );
+      list.appendChild( item );
+      return link;
     } );
+
+    window.addEventListener( 'keydown', ( e ) => {
+      if ( e.key !== 'ArrowUp' && e.key !== 'ArrowDown' ) return;
+      e.preventDefault();
+      const current = links.indexOf( document.activeElement );
+      const step = e.key === 'ArrowUp' ? -1 : 1;
+      const next = current === -1 ? 0 : ( current + step + links.length ) % links.length;
+      links[ next ].focus();
+    } );
+
+    links[ 0 ].focus();
   </script>
 </body>
 </html>

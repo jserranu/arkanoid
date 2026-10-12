@@ -8,7 +8,16 @@ Respon sempre en català, tant a la conversa com als comentaris del codi i als m
 
 ## Estat del projecte
 
-Joc d'Arkanoid/Breakout jugable, amb nou specs implementades (vegeu `specs/`). Punt d'entrada: `index.html`, lògica de joc a `js/game.js`.
+Col·lecció de jocs HTML5. Punt d'entrada: `index.html` (menú de jocs). L'Arkanoid és a `games/arkanoid/` (`index.html`, lògica a `games/arkanoid/js/game.js`); `games/properament/` és un placeholder. Codi comú a `shared/` (SPEC 12). Les specs antigues (01-11) citen rutes d'abans de la reorganització (`index.html`, `js/game.js`, `assets/`): són històriques.
+
+## Estructura i com afegir un joc
+
+- `index.html` — menú HTML/CSS (sense canvas). La llista surt de l'array `GAMES` definit a la mateixa pàgina; cada entrada enllaça a `games/<id>/index.html`.
+- `games/<id>/` — cada joc autocontingut, amb els seus assets i rutes relatives al seu `index.html`. Per tornar al menú: `../../index.html` (a l'Arkanoid, constant `GAME_MENU_URL`).
+- `shared/` — scripts clàssics (no ES modules, perquè ha de funcionar amb `file://`) que només exposen un objecte global i encapsulen la resta en una IIFE. No poden contenir res específic d'un joc: tot arriba per paràmetre.
+  - `ranking.js` → `Ranking.create({ storageKey, maxEntries, extraField, extraLabel })`: `load`, `add({ name, score, extra })`, `playerNames`, `isEmpty`, `entries`, `drawTable(ctx, left, top, highlightEntry)`. Clau per joc: `<id>:ranking:v1` (l'Arkanoid manté `arkanoid:ranking:v1` amb `extraField: 'level'`).
+  - `player-select.js` → `PlayerSelect.create({ ctx, width, height, title, ranking, nameMaxLength, defaultName, onPlayerChosen })`: `start`, `draw`, `handleKey`, `handleMouseMove` (retorna si ha consumit l'event), `handleClick`. A l'Arkanoid s'hi delega mentre `gameState === 'choosePlayer'`.
+- Afegir un joc: crear `games/<id>/index.html` (carregant `../../shared/*.js` abans del seu codi si els fa servir) i afegir-ne l'entrada a `GAMES` d'`index.html`.
 
 ## Specs implementades
 
@@ -34,7 +43,7 @@ Per a properes funcionalitats, seguir el mateix flux: `/spec` per definir la spe
 
 ## Stack
 
-HTML5 Canvas + JavaScript pur (sense eines de build, sense framework, sense `package.json`). El renderitzat es basa en sprites, a partir d'un spritesheet compartit.
+HTML5 Canvas + JavaScript pur (sense eines de build, sense framework, sense `package.json`). El renderitzat de l'Arkanoid es basa en sprites, a partir d'un spritesheet propi del joc (rutes relatives a `games/arkanoid/`).
 
 - `assets/spritesheet-breakout.png` — l'atles de sprites.
 - `assets/spritesheet.js` — la taula de coordenades dels sprites (`SPRITES`, `EXPLOSION_FRAMES`) i les funcions auxiliars de càrrega/dibuix (`loadSpritesheet`, `drawSprite`, `drawFrame`). Cal carregar l'spritesheet de forma asíncrona amb `loadSpritesheet(cb)` abans de dibuixar res.

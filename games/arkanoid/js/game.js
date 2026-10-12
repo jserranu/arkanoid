@@ -35,22 +35,9 @@ const LIFE_STAR_COLOR = '#43a047';
 const LIFE_STAR_ZIGZAG_MIN_AMPLITUDE = 20;
 const LIFE_STAR_ZIGZAG_MAX_AMPLITUDE = 50;
 const LIFE_STAR_ZIGZAG_SPEED = 0.05;
-const PLAYER_NAME_MAX_LENGTH = 10;
-const PLAYER_NAME_DEFAULT = 'ANÒNIM';
-const RANKING_MAX_ENTRIES = 10;
 const RANKING_STORAGE_KEY = 'arkanoid:ranking:v1';
-const PLAYER_LIST_ROW_HEIGHT = 30;
-const PLAYER_LIST_LEFT = 470;
-const PLAYER_LIST_WIDTH = 300;
-const PLAYER_LIST_HEADER_Y = 150;
-const NEW_PLAYER_LABEL = 'Nou jugador';
-const GAMES = [
-  { id: 'arkanoid', label: 'Arkanoid', url: null },
-  { id: 'properament', label: 'Properament', url: 'games/properament/index.html' }
-];
-const GAME_LIST_ROW_HEIGHT = 40;
-const GAME_LIST_TOP = 220;
-const GAME_LIST_WIDTH = 300;
+const RANKING_TABLE_TOP = 150;
+const GAME_MENU_URL = '../../index.html';
 const GAMES_BUTTON = { x: 664, y: 44, width: 120, height: 36, label: 'Jocs' };
 const BASE_BALL_SPEED_X = 3.2;
 const BASE_BALL_SPEED_Y = -3.2;
@@ -114,12 +101,13 @@ let levelFrames;
 let lastLevelBonus;
 let muted = false;
 let playerName = '';
-let nameInput = '';
-let ranking = [];
+const ranking = Ranking.create( {
+  storageKey: RANKING_STORAGE_KEY,
+  extraField: 'level',
+  extraLabel: 'Nivell'
+} );
 let lastRankingEntry = null;
-let playerOptions = [];
-let selectedPlayerIndex = 0;
-let selectedGameIndex = 0;
+let playerSelect;
 let gamesButtonHovered = false;
 
 const ballBounceAudio = new Audio( 'assets/sounds/ball-bounce.mp3' );
@@ -135,134 +123,33 @@ const keysPressed = {};
 let mouseX = null;
 let lastInput = 'keyboard';
 
-function isValidRankingEntry( entry ) {
-  return entry !== null
-    && typeof entry === 'object'
-    && typeof entry.name === 'string'
-    && Number.isFinite( entry.score )
-    && Number.isFinite( entry.level )
-    && Number.isFinite( entry.date );
-}
-
-function loadRanking() {
-  ranking = [];
-  try {
-    const raw = localStorage.getItem( RANKING_STORAGE_KEY );
-    if ( !raw ) return;
-    const parsed = JSON.parse( raw );
-    if ( Array.isArray( parsed ) ) {
-      ranking = parsed.filter( isValidRankingEntry ).slice( 0, RANKING_MAX_ENTRIES );
-    }
-  } catch ( error ) {
-    ranking = [];
-  }
-}
-
-function saveRanking() {
-  try {
-    localStorage.setItem( RANKING_STORAGE_KEY, JSON.stringify( ranking ) );
-  } catch ( error ) {
-    // localStorage no disponible: el rànquing continua només en memòria
-  }
-}
-
 function addRankingEntry() {
-  const existingIndex = ranking.findIndex( ( item ) => item.name === playerName );
-  if ( existingIndex !== -1 ) {
-    if ( score <= ranking[ existingIndex ].score ) {
-      lastRankingEntry = null;
-      return;
-    }
-    ranking.splice( existingIndex, 1 );
-  }
-
-  const entry = {
-    name: playerName,
-    score,
-    level: currentLevel,
-    date: Date.now()
-  };
-  ranking.push( entry );
-  ranking.sort( ( a, b ) => b.score - a.score || a.date - b.date );
-  ranking = ranking.slice( 0, RANKING_MAX_ENTRIES );
-  lastRankingEntry = entry;
-  saveRanking();
+  lastRankingEntry = ranking.add( { name: playerName, score, extra: currentLevel } );
 }
 
-function getPlayerOptions() {
-  return [ ...new Set( ranking.map( ( entry ) => entry.name ) ) ];
-}
-
-function enterSelectPlayer() {
-  playerOptions = getPlayerOptions();
-  selectedPlayerIndex = 0;
-  nameInput = '';
-  gameState = 'selectPlayer';
-}
-
+// Selecció de jugador (llista o entrada del nom) delegada al component comú
 function promptForPlayer() {
-  if ( ranking.length > 0 ) {
-    enterSelectPlayer();
-  } else {
-    gameState = 'enterName';
-    nameInput = '';
-  }
+  gameState = 'choosePlayer';
+  playerSelect.start();
 }
 
-function getPlayerListRowAt( x, y ) {
-  if ( x < PLAYER_LIST_LEFT || x > PLAYER_LIST_LEFT + PLAYER_LIST_WIDTH ) return -1;
-  const firstRowTop = PLAYER_LIST_HEADER_Y + PLAYER_LIST_ROW_HEIGHT / 2;
-  const row = Math.floor( ( y - firstRowTop ) / PLAYER_LIST_ROW_HEIGHT );
-  return row >= 0 && row <= playerOptions.length ? row : -1;
-}
-
-function enterSelectGame() {
-  selectedGameIndex = 0;
-  gameState = 'selectGame';
-}
-
-// GAME_LIST_TOP és la y del centre de la primera fila; la llista està centrada horitzontalment
-function getGameListRowAt( x, y ) {
-  const left = ( CANVAS_WIDTH - GAME_LIST_WIDTH ) / 2;
-  if ( x < left || x > left + GAME_LIST_WIDTH ) return -1;
-  const row = Math.floor( ( y - GAME_LIST_TOP + GAME_LIST_ROW_HEIGHT / 2 ) / GAME_LIST_ROW_HEIGHT );
-  return row >= 0 && row < GAMES.length ? row : -1;
-}
-
-function confirmGameSelection() {
-  const game = GAMES[ selectedGameIndex ];
-  if ( game.url === null ) {
-    promptForPlayer();
-  } else {
-    window.location.href = game.url;
-  }
+function startWithPlayer( name ) {
+  playerName = name;
+  gameState = 'playing';
 }
 
 function isGamesButtonVisible() {
   return gameState === 'paused' || gameState === 'won' || gameState === 'lost';
 }
 
-// Abandona la partida en curs (no es desa al rànquing) i torna al selector de jocs
+// Abandona la partida en curs (no es desa al rànquing) i torna al menú de jocs
 function returnToGameSelector() {
-  createInitialState();
-  gamesButtonHovered = false;
-  enterSelectGame();
+  window.location.href = GAME_MENU_URL;
 }
 
 function isOverGamesButton( x, y ) {
   return x >= GAMES_BUTTON.x && x <= GAMES_BUTTON.x + GAMES_BUTTON.width &&
     y >= GAMES_BUTTON.y && y <= GAMES_BUTTON.y + GAMES_BUTTON.height;
-}
-
-function confirmPlayerSelection() {
-  if ( selectedPlayerIndex < playerOptions.length ) {
-    playerName = playerOptions[ selectedPlayerIndex ];
-    nameInput = '';
-    gameState = 'playing';
-  } else {
-    nameInput = '';
-    gameState = 'enterName';
-  }
 }
 
 function resetPaddleAndBall() {
@@ -1168,28 +1055,6 @@ function drawLives() {
   }
 }
 
-function drawNameScreen() {
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  ctx.font = 'bold 56px sans-serif';
-  ctx.fillText( 'ARKANOID', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100 );
-
-  ctx.font = '24px sans-serif';
-  ctx.fillText( 'Escriu el teu nom', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30 );
-
-  const cursorVisible = Math.floor( performance.now() / 500 ) % 2 === 0;
-  ctx.font = 'bold 36px monospace';
-  ctx.fillText( nameInput + ( cursorVisible ? '_' : ' ' ), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20 );
-
-  ctx.font = '16px sans-serif';
-  ctx.fillText( 'Prem Enter per començar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80 );
-  if ( ranking.length > 0 ) {
-    ctx.fillText( 'Esc per tornar', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 108 );
-  }
-}
-
 function getQuizResultMessage() {
   if ( quiz.success ) return 'Correcte! +1 habilitat';
   return quiz.skillDelta < 0 ? 'Error! −1 habilitat' : 'Error! Sense habilitats per perdre';
@@ -1266,31 +1131,6 @@ function drawQuizScreen() {
   ctx.fillText( 'Escriu la resposta i prem Enter o Espai', centerX, 450 );
 }
 
-function drawSelectGameScreen() {
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 40px sans-serif';
-  ctx.fillText( 'Tria un joc', CANVAS_WIDTH / 2, 120 );
-
-  const left = ( CANVAS_WIDTH - GAME_LIST_WIDTH ) / 2;
-  ctx.font = '22px sans-serif';
-  for ( let i = 0; i < GAMES.length; i++ ) {
-    const y = GAME_LIST_TOP + i * GAME_LIST_ROW_HEIGHT;
-    const selected = i === selectedGameIndex;
-    if ( selected ) {
-      ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
-      ctx.fillRect( left, y - GAME_LIST_ROW_HEIGHT / 2, GAME_LIST_WIDTH, GAME_LIST_ROW_HEIGHT );
-    }
-    ctx.fillStyle = selected ? '#ffeb3b' : '#fff';
-    ctx.fillText( GAMES[ i ].label, CANVAS_WIDTH / 2, y );
-  }
-
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px sans-serif';
-  ctx.fillText( '↑↓ per triar · Enter per jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40 );
-}
-
 function drawGamesButton() {
   const { x, y, width, height, label } = GAMES_BUTTON;
   ctx.fillStyle = gamesButtonHovered ? 'rgba(255, 235, 59, 0.2)' : 'rgba(255, 255, 255, 0.1)';
@@ -1303,73 +1143,6 @@ function drawGamesButton() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText( label, x + width / 2, y + height / 2 );
-}
-
-function drawSelectPlayerScreen() {
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 40px sans-serif';
-  ctx.fillText( 'ARKANOID', CANVAS_WIDTH / 2, 50 );
-  ctx.font = '22px sans-serif';
-  ctx.fillText( 'Tria jugador', CANVAS_WIDTH / 2, 95 );
-
-  ctx.fillStyle = '#fff';
-  drawRankingTable( 30 );
-
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillStyle = '#aaa';
-  ctx.textAlign = 'left';
-  ctx.fillText( 'Jugadors', PLAYER_LIST_LEFT, PLAYER_LIST_HEADER_Y );
-
-  ctx.font = '18px monospace';
-  for ( let i = 0; i <= playerOptions.length; i++ ) {
-    const isNewPlayer = i === playerOptions.length;
-    const y = PLAYER_LIST_HEADER_Y + ( i + 1 ) * PLAYER_LIST_ROW_HEIGHT;
-    const selected = i === selectedPlayerIndex;
-    if ( selected ) {
-      ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
-      ctx.fillRect( PLAYER_LIST_LEFT - 8, y - PLAYER_LIST_ROW_HEIGHT / 2, PLAYER_LIST_WIDTH, PLAYER_LIST_ROW_HEIGHT );
-    }
-    ctx.fillStyle = selected ? '#ffeb3b' : ( isNewPlayer ? '#aaa' : '#fff' );
-    ctx.textAlign = 'left';
-    ctx.fillText( ( selected ? '> ' : '  ' ) + ( isNewPlayer ? NEW_PLAYER_LABEL : playerOptions[ i ] ), PLAYER_LIST_LEFT, y );
-  }
-
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.font = '16px sans-serif';
-  ctx.fillText( '↑↓ per triar · Enter o clic per jugar', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40 );
-}
-
-function drawRankingTable( left ) {
-  const rowHeight = 30;
-  const tableTop = 150;
-  const columns = { position: left, name: left + 50, score: left + 320, level: left + 400 };
-
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillStyle = '#aaa';
-  ctx.textAlign = 'right';
-  ctx.fillText( '#', columns.position, tableTop );
-  ctx.textAlign = 'left';
-  ctx.fillText( 'Nom', columns.name, tableTop );
-  ctx.textAlign = 'right';
-  ctx.fillText( 'Punts', columns.score, tableTop );
-  ctx.fillText( 'Nivell', columns.level, tableTop );
-
-  ctx.font = '18px monospace';
-  ranking.forEach( ( entry, index ) => {
-    const y = tableTop + ( index + 1 ) * rowHeight;
-    ctx.fillStyle = entry === lastRankingEntry ? '#ffeb3b' : '#fff';
-    ctx.textAlign = 'right';
-    ctx.fillText( `${ index + 1 }`, columns.position, y );
-    ctx.textAlign = 'left';
-    ctx.fillText( entry.name, columns.name, y );
-    ctx.textAlign = 'right';
-    ctx.fillText( `${ entry.score }`, columns.score, y );
-    ctx.fillText( `${ entry.level }`, columns.level, y );
-  } );
 }
 
 function drawRankingScreen( message, continueMessage ) {
@@ -1385,7 +1158,7 @@ function drawRankingScreen( message, continueMessage ) {
     ctx.fillText( `Temps: ${ formatLevelTime( levelFrames ) } · Bonus de temps: +${ lastLevelBonus }`, CANVAS_WIDTH / 2, 122 );
   }
 
-  drawRankingTable( 200 );
+  ranking.drawTable( ctx, 200, RANKING_TABLE_TOP, lastRankingEntry );
 
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -1396,22 +1169,12 @@ function drawRankingScreen( message, continueMessage ) {
 function drawOverlay() {
   if ( gameState === 'playing' ) return;
 
-  const darkOverlay = gameState === 'selectGame' || gameState === 'selectPlayer' || gameState === 'enterName' || gameState === 'quiz' || gameState === 'won' || gameState === 'lost';
+  const darkOverlay = gameState === 'choosePlayer' || gameState === 'quiz' || gameState === 'won' || gameState === 'lost';
   ctx.fillStyle = darkOverlay ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.6)';
   ctx.fillRect( 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT );
 
-  if ( gameState === 'selectGame' ) {
-    drawSelectGameScreen();
-    return;
-  }
-
-  if ( gameState === 'selectPlayer' ) {
-    drawSelectPlayerScreen();
-    return;
-  }
-
-  if ( gameState === 'enterName' ) {
-    drawNameScreen();
+  if ( gameState === 'choosePlayer' ) {
+    playerSelect.draw();
     return;
   }
 
@@ -1476,55 +1239,6 @@ function gameLoop() {
   requestAnimationFrame( gameLoop );
 }
 
-function handleSelectGameInput( e ) {
-  if ( e.key === 'ArrowUp' ) {
-    e.preventDefault();
-    selectedGameIndex = ( selectedGameIndex - 1 + GAMES.length ) % GAMES.length;
-  } else if ( e.key === 'ArrowDown' ) {
-    e.preventDefault();
-    selectedGameIndex = ( selectedGameIndex + 1 ) % GAMES.length;
-  } else if ( e.key === 'Enter' ) {
-    e.preventDefault();
-    confirmGameSelection();
-  }
-}
-
-function handleSelectPlayerInput( e ) {
-  const optionCount = playerOptions.length + 1;
-  if ( e.key === 'ArrowUp' ) {
-    e.preventDefault();
-    selectedPlayerIndex = ( selectedPlayerIndex - 1 + optionCount ) % optionCount;
-  } else if ( e.key === 'ArrowDown' ) {
-    e.preventDefault();
-    selectedPlayerIndex = ( selectedPlayerIndex + 1 ) % optionCount;
-  } else if ( e.key === 'Enter' ) {
-    e.preventDefault();
-    confirmPlayerSelection();
-  }
-}
-
-function handleNameInput( e ) {
-  if ( e.key === 'Escape' ) {
-    if ( ranking.length > 0 ) enterSelectPlayer();
-  } else if ( e.key === 'Backspace' ) {
-    e.preventDefault();
-    nameInput = nameInput.slice( 0, -1 );
-  } else if ( e.key === 'Enter' ) {
-    e.preventDefault();
-    playerName = nameInput.trim() || PLAYER_NAME_DEFAULT;
-    gameState = 'playing';
-  } else if ( e.key === ' ' ) {
-    e.preventDefault();
-    if ( nameInput.length > 0 && nameInput.length < PLAYER_NAME_MAX_LENGTH ) {
-      nameInput += ' ';
-    }
-  } else if ( !e.ctrlKey && !e.metaKey && !e.altKey && /^[\p{L}\p{N}]$/u.test( e.key ) ) {
-    if ( nameInput.length < PLAYER_NAME_MAX_LENGTH ) {
-      nameInput += e.key;
-    }
-  }
-}
-
 function getCanvasCoordinates( e ) {
   const rect = canvas.getBoundingClientRect();
   return [
@@ -1535,18 +1249,8 @@ function getCanvasCoordinates( e ) {
 
 function setupInput() {
   window.addEventListener( 'keydown', ( e ) => {
-    if ( gameState === 'selectGame' ) {
-      handleSelectGameInput( e );
-      return;
-    }
-
-    if ( gameState === 'selectPlayer' ) {
-      handleSelectPlayerInput( e );
-      return;
-    }
-
-    if ( gameState === 'enterName' ) {
-      handleNameInput( e );
+    if ( gameState === 'choosePlayer' ) {
+      playerSelect.handleKey( e );
       return;
     }
 
@@ -1584,14 +1288,7 @@ function setupInput() {
   } );
 
   canvas.addEventListener( 'mousemove', ( e ) => {
-    if ( gameState === 'selectGame' ) {
-      const row = getGameListRowAt( ...getCanvasCoordinates( e ) );
-      if ( row !== -1 ) selectedGameIndex = row;
-      return;
-    }
-    if ( gameState === 'selectPlayer' ) {
-      const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
-      if ( row !== -1 ) selectedPlayerIndex = row;
+    if ( gameState === 'choosePlayer' && playerSelect.handleMouseMove( ...getCanvasCoordinates( e ) ) ) {
       return;
     }
     gamesButtonHovered = isGamesButtonVisible() && isOverGamesButton( ...getCanvasCoordinates( e ) );
@@ -1605,22 +1302,11 @@ function setupInput() {
       launchStuckBalls();
       return;
     }
-    if ( gameState === 'selectGame' ) {
-      const gameRow = getGameListRowAt( ...getCanvasCoordinates( e ) );
-      if ( gameRow === -1 ) return;
-      selectedGameIndex = gameRow;
-      confirmGameSelection();
-      return;
-    }
     if ( isGamesButtonVisible() ) {
       if ( isOverGamesButton( ...getCanvasCoordinates( e ) ) ) returnToGameSelector();
       return;
     }
-    if ( gameState !== 'selectPlayer' ) return;
-    const row = getPlayerListRowAt( ...getCanvasCoordinates( e ) );
-    if ( row === -1 ) return;
-    selectedPlayerIndex = row;
-    confirmPlayerSelection();
+    if ( gameState === 'choosePlayer' ) playerSelect.handleClick( ...getCanvasCoordinates( e ) );
   } );
 }
 
@@ -1628,9 +1314,17 @@ function initGame() {
   canvas = document.getElementById( 'game' );
   ctx = canvas.getContext( '2d' );
 
-  loadRanking();
+  ranking.load();
+  playerSelect = PlayerSelect.create( {
+    ctx,
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
+    title: 'ARKANOID',
+    ranking,
+    onPlayerChosen: startWithPlayer
+  } );
   createInitialState();
-  enterSelectGame();
+  promptForPlayer();
   setupInput();
   requestAnimationFrame( gameLoop );
 }

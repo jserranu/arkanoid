@@ -1,7 +1,15 @@
 
 # Joc de Arkanoid
 
-Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de build. Obre `index.html` en un navegador per jugar-hi.
+Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de build. Obre `index.html` en un navegador: és el menú de jocs, des d'on es tria l'Arkanoid (o s'obre directament `games/arkanoid/index.html`). No cal cap servidor; funciona amb `file://`.
+
+## Estructura
+
+- `index.html` — menú de jocs (↑↓ per triar, Enter o clic per jugar).
+- `games/<id>/` — cada joc, autocontingut: `index.html`, el seu JavaScript i els seus assets. Ara hi ha `games/arkanoid/` i el placeholder `games/properament/`.
+- `shared/` — codi comú entre jocs, carregat amb `<script>` clàssics:
+  - `ranking.js` — rànquing Top N persistent a `localStorage` (`window.Ranking`).
+  - `player-select.js` — pantalles de selecció de jugador i entrada del nom al canvas (`window.PlayerSelect`).
 
 ## Controls
 
@@ -10,6 +18,7 @@ Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependènci
 - **M** per silenciar/activar els efectes de so.
 - **P** o **Escape** per posar el joc en pausa; **Espai** o **Enter** per continuar.
 - **Espai** o **clic de ratolí** per disparar la pilota quan està enganxada a la pala (power-up magnètic).
+- Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú de jocs.
 - A la pantalla inicial: **fletxes amunt/avall** i **Enter** (o el **ratolí**) per triar jugador; **Escape** per tornar a la selecció des de l'entrada de nom.
 
 ## Funcionalitats
