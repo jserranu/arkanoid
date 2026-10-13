@@ -8,15 +8,16 @@ Respon sempre en català, tant a la conversa com als comentaris del codi i als m
 
 ## Estat del projecte
 
-Col·lecció de jocs HTML5. Punt d'entrada: `index.html` (menú de jocs). L'Arkanoid és a `games/arkanoid/` (`index.html`, lògica a `games/arkanoid/js/game.js`); `games/properament/` és un placeholder. Codi comú a `shared/` (SPEC 12). Les specs antigues (01-11) citen rutes d'abans de la reorganització (`index.html`, `js/game.js`, `assets/`): són històriques.
+Col·lecció de jocs HTML5. Punt d'entrada: `index.html` (menú de jocs). Jocs: l'Arkanoid a `games/arkanoid/` (`index.html`, lògica a `games/arkanoid/js/game.js`) i Starship a `games/starship/` (SPEC 13, lògica a `games/starship/js/game.js`). Codi comú a `shared/` (SPEC 12). Les specs antigues (01-11) citen rutes d'abans de la reorganització (`index.html`, `js/game.js`, `assets/`): són històriques.
 
 ## Estructura i com afegir un joc
 
 - `index.html` — menú HTML/CSS (sense canvas). La llista surt de l'array `GAMES` definit a la mateixa pàgina; cada entrada enllaça a `games/<id>/index.html`.
-- `games/<id>/` — cada joc autocontingut, amb els seus assets i rutes relatives al seu `index.html`. Per tornar al menú: `../../index.html` (a l'Arkanoid, constant `GAME_MENU_URL`).
+- `games/<id>/` — cada joc autocontingut, amb els seus assets i rutes relatives al seu `index.html`. Per tornar al menú: `../../index.html` (constant `GAME_MENU_URL` a cada joc).
 - `shared/` — scripts clàssics (no ES modules, perquè ha de funcionar amb `file://`) que només exposen un objecte global i encapsulen la resta en una IIFE. No poden contenir res específic d'un joc: tot arriba per paràmetre.
-  - `ranking.js` → `Ranking.create({ storageKey, maxEntries, extraField, extraLabel })`: `load`, `add({ name, score, extra })`, `playerNames`, `isEmpty`, `entries`, `drawTable(ctx, left, top, highlightEntry)`. Clau per joc: `<id>:ranking:v1` (l'Arkanoid manté `arkanoid:ranking:v1` amb `extraField: 'level'`).
-  - `player-select.js` → `PlayerSelect.create({ ctx, width, height, title, ranking, nameMaxLength, defaultName, onPlayerChosen })`: `start`, `draw`, `handleKey`, `handleMouseMove` (retorna si ha consumit l'event), `handleClick`. A l'Arkanoid s'hi delega mentre `gameState === 'choosePlayer'`.
+  - `ranking.js` → `Ranking.create({ storageKey, maxEntries, extraField, extraLabel })`: `load`, `add({ name, score, extra })`, `playerNames`, `isEmpty`, `entries`, `drawTable(ctx, left, top, highlightEntry)`. Clau per joc: `<id>:ranking:v1` (`arkanoid:ranking:v1` i `starship:ranking:v1`, tots dos amb `extraField: 'level'`).
+  - `player-select.js` → `PlayerSelect.create({ ctx, width, height, title, ranking, nameMaxLength, defaultName, onPlayerChosen })`: `start`, `draw`, `handleKey`, `handleMouseMove` (retorna si ha consumit l'event), `handleClick`. Els jocs hi deleguen mentre `gameState === 'choosePlayer'`.
+- El botó «Jocs», la pausa i el bucle de joc no són a `shared/`: Starship en té una còpia pròpia de l'Arkanoid (decisió de SPEC 13).
 - Afegir un joc: crear `games/<id>/index.html` (carregant `../../shared/*.js` abans del seu codi si els fa servir) i afegir-ne l'entrada a `GAMES` d'`index.html`.
 
 ## Specs implementades
@@ -39,11 +40,13 @@ Ampliació a 10 nivells (canvi directe, sense spec): `TOTAL_LEVELS = 11`, amb 5 
 
 Estrella blava (canvi directe, sense spec): 1 bloc per nivell la porta; en capturar-la durant 30 s la pilota va ×1.5 més ràpida i s'enganxa al centre de la pala en lloc de rebotar; Espai o clic de ratolí la dispara en línia recta cap amunt (`magnetModeActive`, `launchStuckBalls`). En perdre una vida o canviar de nivell l'efecte es cancel·la.
 
+**Starship** (`13-joc-starship.md`, substitueix el placeholder «Properament»): nau en 2D (fletxes/WASD per `e.code`, taula `MOVE_KEYS`) que dispara mantenint Espai (`FIRE_COOLDOWN_FRAMES`) contra asteroides que cauen en vertical o en diagonal (rebot lateral) i es divideixen gran → 2 mitjans → 2 petits (20/50/100 punts, `ASTEROID_SIZES`). 3 vides (xoc amb la nau, 2 s d'invulnerabilitat), 5 nivells de 60 s amb dificultat a `LEVELS`, pausa i botó «Jocs» com a l'Arkanoid. Gràfics amb paths del canvas, sense assets ni sons. `endGame()` és l'únic punt que desa al rànquing.
+
 Per a properes funcionalitats, seguir el mateix flux: `/spec` per definir la spec a `specs/NN-slug.md`, marcar-la `Approved` manualment i després `/spec-impl NN-slug`.
 
 ## Stack
 
-HTML5 Canvas + JavaScript pur (sense eines de build, sense framework, sense `package.json`). El renderitzat de l'Arkanoid es basa en sprites, a partir d'un spritesheet propi del joc (rutes relatives a `games/arkanoid/`).
+HTML5 Canvas + JavaScript pur (sense eines de build, sense framework, sense `package.json`). Starship ho dibuixa tot amb paths del canvas. El renderitzat de l'Arkanoid es basa en sprites, a partir d'un spritesheet propi del joc (rutes relatives a `games/arkanoid/`).
 
 - `assets/spritesheet-breakout.png` — l'atles de sprites.
 - `assets/spritesheet.js` — la taula de coordenades dels sprites (`SPRITES`, `EXPLOSION_FRAMES`) i les funcions auxiliars de càrrega/dibuix (`loadSpritesheet`, `drawSprite`, `drawFrame`). Cal carregar l'spritesheet de forma asíncrona amb `loadSpritesheet(cb)` abans de dibuixar res.

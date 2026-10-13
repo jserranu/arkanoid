@@ -1,17 +1,17 @@
 
 # Joc de Arkanoid
 
-Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de build. Obre `index.html` en un navegador: és el menú de jocs, des d'on es tria l'Arkanoid (o s'obre directament `games/arkanoid/index.html`). No cal cap servidor; funciona amb `file://`.
+Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de build: un Arkanoid/Breakout i **Starship** (una nau que destrueix asteroides). Obre `index.html` en un navegador: és el menú de jocs, des d'on es tria el joc (o s'obre directament `games/<id>/index.html`). No cal cap servidor; funciona amb `file://`.
 
 ## Estructura
 
 - `index.html` — menú de jocs (↑↓ per triar, Enter o clic per jugar).
-- `games/<id>/` — cada joc, autocontingut: `index.html`, el seu JavaScript i els seus assets. Ara hi ha `games/arkanoid/` i el placeholder `games/properament/`.
+- `games/<id>/` — cada joc, autocontingut: `index.html`, el seu JavaScript i els seus assets. Ara hi ha `games/arkanoid/` i `games/starship/`.
 - `shared/` — codi comú entre jocs, carregat amb `<script>` clàssics:
   - `ranking.js` — rànquing Top N persistent a `localStorage` (`window.Ranking`).
   - `player-select.js` — pantalles de selecció de jugador i entrada del nom al canvas (`window.PlayerSelect`).
 
-## Controls
+## Controls de l'Arkanoid
 
 - **Fletxes esquerra/dreta** o **A/D**, o el **ratolí**, per moure la pala.
 - **Espai** o **Enter** per reiniciar la partida des de les pantalles de victòria, "nivell superat" o derrota.
@@ -21,7 +21,7 @@ Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependènci
 - Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú de jocs.
 - A la pantalla inicial: **fletxes amunt/avall** i **Enter** (o el **ratolí**) per triar jugador; **Escape** per tornar a la selecció des de l'entrada de nom.
 
-## Funcionalitats
+## Funcionalitats de l'Arkanoid
 
 - Pala i pilota amb física de rebot bàsica (l'angle de rebot a la pala depèn del punt d'impacte).
 - 11 nivells amb graelles de blocs generades proceduralment (colors aleatoris per fila).
@@ -37,6 +37,15 @@ Joc d'Arkanoid/Breakout fet amb HTML5 Canvas i JavaScript pur, sense dependènci
 - Pausa del joc amb P o Escape.
 - Nom de jugador i rànquing Top 10 persistent a `localStorage`, amb selecció de jugador a la pantalla inicial.
 - Puntuació i vides, amb estats de victòria (per nivell i final) i derrota.
+
+## Starship
+
+- **Fletxes** o **WASD** per moure la nau per tota la pantalla (8 direccions).
+- Mantenir **Espai** per disparar.
+- **P** o **Escape** per posar el joc en pausa; **Espai** o **Enter** per continuar o per passar de nivell.
+- Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú.
+
+Els asteroides cauen en vertical o en diagonal; en disparar-los, els grans es divideixen en 2 mitjans i els mitjans en 2 petits (20/50/100 punts). 3 vides: es perd una vida quan un asteroide toca la nau. 5 nivells de 60 s, cada un amb més asteroides i més ràpids. Selecció de jugador i rànquing Top 10 propis, com a l'Arkanoid.
 
 ## Desenvolupament
 
