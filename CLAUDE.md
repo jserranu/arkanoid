@@ -12,13 +12,15 @@ Col·lecció de jocs HTML5. Punt d'entrada: `index.html` (menú de jocs). Jocs: 
 
 ## Estructura i com afegir un joc
 
-- `index.html` — menú HTML/CSS (sense canvas). La llista surt de l'array `GAMES` definit a la mateixa pàgina; cada entrada enllaça a `games/<id>/index.html`.
+- `index.html` — menú HTML/CSS (sense canvas). La llista surt de `window.GAMES` (`shared/games.js`); cada entrada enllaça a `games/<id>/index.html`. Sota la llista, l'enllaç «Puntuacions» (`scores/index.html`), darrer element del cicle ↑↓.
+- `scores/index.html` — pàgina de només consulta (SPEC 14): una pestanya per joc de `GAMES` i una `<table>` HTML amb `Ranking.create( game.ranking ).entries` (#, Nom, Punts, columna extra, Data). ←→ canvien de pestanya, Escape torna al menú. No escriu mai a `localStorage`.
 - `games/<id>/` — cada joc autocontingut, amb els seus assets i rutes relatives al seu `index.html`. Per tornar al menú: `../../index.html` (constant `GAME_MENU_URL` a cada joc).
 - `shared/` — scripts clàssics (no ES modules, perquè ha de funcionar amb `file://`) que només exposen un objecte global i encapsulen la resta en una IIFE. No poden contenir res específic d'un joc: tot arriba per paràmetre.
+  - `games.js` → `window.GAMES`: `{ id, label, ranking: { storageKey, extraField, extraLabel } }` per joc. L'objecte `ranking` es passa tal qual a `Ranking.create()`. Els jocs **no** el llegeixen: creen el seu `Ranking` amb la seva pròpia configuració.
   - `ranking.js` → `Ranking.create({ storageKey, maxEntries, extraField, extraLabel })`: `load`, `add({ name, score, extra })`, `playerNames`, `isEmpty`, `entries`, `drawTable(ctx, left, top, highlightEntry)`. Clau per joc: `<id>:ranking:v1` (`arkanoid:ranking:v1` i `starship:ranking:v1`, tots dos amb `extraField: 'level'`).
   - `player-select.js` → `PlayerSelect.create({ ctx, width, height, title, ranking, nameMaxLength, defaultName, onPlayerChosen })`: `start`, `draw`, `handleKey`, `handleMouseMove` (retorna si ha consumit l'event), `handleClick`. Els jocs hi deleguen mentre `gameState === 'choosePlayer'`.
 - El botó «Jocs», la pausa i el bucle de joc no són a `shared/`: Starship en té una còpia pròpia de l'Arkanoid (decisió de SPEC 13).
-- Afegir un joc: crear `games/<id>/index.html` (carregant `../../shared/*.js` abans del seu codi si els fa servir) i afegir-ne l'entrada a `GAMES` d'`index.html`.
+- Afegir un joc: crear `games/<id>/index.html` (carregant `../../shared/*.js` abans del seu codi si els fa servir) i afegir-ne l'entrada, amb la configuració del rànquing, a `GAMES` de `shared/games.js`. La `storageKey` i `extraField` de `shared/games.js` han de coincidir amb les de `games/<id>/js/game.js`: si es canvia l'una, cal revisar l'altra (si no, la pàgina de puntuacions mostra un rànquing buit).
 
 ## Specs implementades
 

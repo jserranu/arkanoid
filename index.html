@@ -37,6 +37,12 @@
       color: #ffeb3b;
       background: rgba(255, 235, 59, 0.2);
     }
+    /* enllaç a les puntuacions: separat dels jocs, però amb el mateix ressaltat */
+    #scores-link {
+      width: 300px;
+      margin-top: 24px;
+      font-size: 17px;
+    }
     p {
       margin-top: 40px;
       font-size: 16px;
@@ -46,14 +52,11 @@
 <body>
   <h1>Tria un joc</h1>
   <ul id="games"></ul>
+  <a id="scores-link" href="scores/index.html">Puntuacions</a>
   <p>↑↓ per triar · Enter per jugar</p>
 
+  <script src="shared/games.js"></script>
   <script>
-    const GAMES = [
-      { id: 'arkanoid', label: 'Arkanoid' },
-      { id: 'starship', label: 'Starship' }
-    ];
-
     const list = document.getElementById( 'games' );
     const links = GAMES.map( ( game ) => {
       const link = document.createElement( 'a' );
@@ -66,6 +69,11 @@
       list.appendChild( item );
       return link;
     } );
+
+    // «Puntuacions» no és un joc, però entra al cicle de fletxes com a darrer element
+    const scoresLink = document.getElementById( 'scores-link' );
+    scoresLink.addEventListener( 'mouseenter', () => scoresLink.focus() );
+    links.push( scoresLink );
 
     window.addEventListener( 'keydown', ( e ) => {
       if ( e.key !== 'ArrowUp' && e.key !== 'ArrowDown' ) return;

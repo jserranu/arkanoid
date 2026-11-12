@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <title>Puntuacions</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 40px;
+    }
+    a {
+      display: block;
+      padding: 8px 16px;
+      color: #fff;
+      font-size: 17px;
+      text-decoration: none;
+      outline: none;
+    }
+    a:focus,
+    a:hover {
+      color: #ffeb3b;
+      background: rgba(255, 235, 59, 0.2);
+    }
+    #tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    #tabs button {
+      padding: 8px 20px;
+      background: none;
+      border: 1px solid #555;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #tabs button.active {
+      color: #ffeb3b;
+      border-color: #ffeb3b;
+      background: rgba(255, 235, 59, 0.2);
+    }
+    #content {
+      min-width: 480px;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 18px;
+    }
+    th {
+      color: #aaa;
+      text-align: left;
+      padding: 6px 12px;
+      border-bottom: 1px solid #555;
+    }
+    td {
+      padding: 6px 12px;
+      font-family: monospace;
+    }
+    .num {
+      text-align: right;
+    }
+    .help {
+      margin-top: 40px;
+      font-size: 16px;
+    }
+    .empty {
+      text-align: center;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <h1>Puntuacions</h1>
+  <div id="tabs"></div>
+  <div id="content"></div>
+  <a href="../index.html">Tornar al menú</a>
+  <p class="help">←→ per canviar de joc · Esc per tornar</p>
+
+  <script src="../shared/games.js"></script>
+  <script src="../shared/ranking.js"></script>
+  <script>
+    const tabsContainer = document.getElementById( 'tabs' );
+    const content = document.getElementById( 'content' );
+    let activeIndex = 0;
+
+    const tabs = GAMES.map( ( game ) => {
+      const tab = document.createElement( 'button' );
+      tab.type = 'button';
+      tab.textContent = game.label;
+      tabsContainer.appendChild( tab );
+      return tab;
+    } );
+
+    function formatDate( timestamp ) {
+      const date = new Date( timestamp );
+      const pad = ( value ) => String( value ).padStart( 2, '0' );
+      return `${ pad( date.getDate() ) }/${ pad( date.getMonth() + 1 ) }/${ date.getFullYear() }`;
+    }
+
+    // Crea una fila; les cel·les s'omplen amb textContent perquè els noms poden tenir caràcters HTML
+    function createRow( tag, cells ) {
+      const row = document.createElement( 'tr' );
+      cells.forEach( ( { text, numeric } ) => {
+        const cell = document.createElement( tag );
+        cell.textContent = text;
+        if ( numeric ) cell.className = 'num';
+        row.appendChild( cell );
+      } );
+      return row;
+    }
+
+    function renderTab( index ) {
+      activeIndex = index;
+      tabs.forEach( ( tab, i ) => tab.classList.toggle( 'active', i === index ) );
+
+      const config = GAMES[ index ].ranking;
+      const ranking = Ranking.create( config );
+      ranking.load();
+      const entries = ranking.entries;
+      const hasExtra = Boolean( config.extraField );
+
+      content.replaceChildren();
+      if ( entries.length === 0 ) {
+        const message = document.createElement( 'p' );
+        message.className = 'empty';
+        message.textContent = 'Encara no hi ha puntuacions';
+        content.appendChild( message );
+        return;
+      }
+
+      const columns = ( position, name, score, extra, date ) => [
+        { text: position, numeric: true },
+        { text: name },
+        { text: score, numeric: true },
+        ...( hasExtra ? [ { text: extra, numeric: true } ] : [] ),
+        { text: date }
+      ];
+      const table = document.createElement( 'table' );
+      table.appendChild( createRow( 'th', columns( '#', 'Nom', 'Punts', config.extraLabel, 'Data' ) ) );
+      entries.forEach( ( entry, i ) => {
+        table.appendChild( createRow( 'td', columns(
+          `${ i + 1 }`, entry.name, `${ entry.score }`, `${ entry[ config.extraField ] }`, formatDate( entry.date )
+        ) ) );
+      } );
+      content.appendChild( table );
+    }
+
+    tabs.forEach( ( tab, i ) => tab.addEventListener( 'click', () => renderTab( i ) ) );
+
+    window.addEventListener( 'keydown', ( e ) => {
+      if ( e.key === 'Escape' ) {
+        window.location.href = '../index.html';
+        return;
+      }
+      if ( e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' ) return;
+      e.preventDefault();
+      const step = e.key === 'ArrowLeft' ? -1 : 1;
+      renderTab( ( activeIndex + step + tabs.length ) % tabs.length );
+    } );
+
+    renderTab( 0 );
+  </script>
+</body>
+</html>

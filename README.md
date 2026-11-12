@@ -5,9 +5,11 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
 
 ## Estructura
 
-- `index.html` — menú de jocs (↑↓ per triar, Enter o clic per jugar).
+- `index.html` — menú de jocs (↑↓ per triar, Enter o clic per jugar), amb l'enllaç «Puntuacions» al final.
 - `games/<id>/` — cada joc, autocontingut: `index.html`, el seu JavaScript i els seus assets. Ara hi ha `games/arkanoid/` i `games/starship/`.
-- `shared/` — codi comú entre jocs, carregat amb `<script>` clàssics:
+- `scores/index.html` — pàgina de consulta dels rànquings de tots els jocs.
+- `shared/` — codi comú, carregat amb `<script>` clàssics:
+  - `games.js` — llista de jocs del menú i configuració del rànquing de cadascun (`window.GAMES`).
   - `ranking.js` — rànquing Top N persistent a `localStorage` (`window.Ranking`).
   - `player-select.js` — pantalles de selecció de jugador i entrada del nom al canvas (`window.PlayerSelect`).
 
@@ -46,6 +48,12 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
 - Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú.
 
 Els asteroides cauen en vertical o en diagonal; en disparar-los, els grans es divideixen en 2 mitjans i els mitjans en 2 petits (20/50/100 punts). 3 vides: es perd una vida quan un asteroide toca la nau. 5 nivells de 60 s, cada un amb més asteroides i més ràpids. Selecció de jugador i rànquing Top 10 propis, com a l'Arkanoid.
+
+## Puntuacions
+
+Des del menú, l'enllaç **Puntuacions** obre `scores/index.html`, una pàgina de només consulta amb una pestanya per joc i la taula del seu Top 10 (#, nom, punts, nivell i data). **Fletxes esquerra/dreta** o clic per canviar de joc; **Escape** o l'enllaç «Tornar al menú» per tornar.
+
+Els rànquings es llegeixen del `localStorage` del navegador. Amb `file://`, alguns navegadors separen el `localStorage` per fitxer o carpeta: si la pàgina no mostra les puntuacions que es veuen dins dels jocs, serveix el projecte amb un servidor estàtic (p. ex. `python -m http.server`).
 
 ## Desenvolupament
 
