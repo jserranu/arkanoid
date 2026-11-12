@@ -36,6 +36,8 @@ const LIFE_STAR_ZIGZAG_MIN_AMPLITUDE = 20;
 const LIFE_STAR_ZIGZAG_MAX_AMPLITUDE = 50;
 const LIFE_STAR_ZIGZAG_SPEED = 0.05;
 const RANKING_STORAGE_KEY = 'arkanoid:ranking:v1';
+// Llista de jugadors comuna a tots els jocs (shared/players.js)
+const PLAYERS_STORAGE_KEY = 'players:v1';
 const RANKING_TABLE_TOP = 150;
 const GAME_MENU_URL = '../../index.html';
 const GAMES_BUTTON = { x: 664, y: 44, width: 120, height: 36, label: 'Jocs' };
@@ -107,6 +109,10 @@ const ranking = Ranking.create( {
   extraLabel: 'Nivell'
 } );
 let lastRankingEntry = null;
+const players = Players.create( {
+  storageKey: PLAYERS_STORAGE_KEY,
+  importFrom: GAMES.map( ( game ) => game.ranking )
+} );
 let playerSelect;
 let gamesButtonHovered = false;
 
@@ -1308,6 +1314,11 @@ function setupInput() {
     }
     if ( gameState === 'choosePlayer' ) playerSelect.handleClick( ...getCanvasCoordinates( e ) );
   } );
+
+  // Roda del ratolí: desplaça la llista de jugadors sense desplaçar la pàgina
+  canvas.addEventListener( 'wheel', ( e ) => {
+    if ( gameState === 'choosePlayer' && playerSelect.handleWheel( e.deltaY ) ) e.preventDefault();
+  }, { passive: false } );
 }
 
 function initGame() {
@@ -1315,12 +1326,14 @@ function initGame() {
   ctx = canvas.getContext( '2d' );
 
   ranking.load();
+  players.load();
   playerSelect = PlayerSelect.create( {
     ctx,
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     title: 'ARKANOID',
     ranking,
+    players,
     onPlayerChosen: startWithPlayer
   } );
   createInitialState();

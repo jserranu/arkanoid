@@ -7,6 +7,8 @@ window.PlayerSelect = ( () => {
   const LIST_HEADER_Y = 150;
   const TABLE_LEFT = 30;
   const NEW_PLAYER_LABEL = 'Nou jugador';
+  const LIST_VISIBLE_ROWS = 11;    // files visibles (jugadors + «Nou jugador»); la resta es desplaça
+  const SCROLL_INDICATOR_COLOR = '#aaa';
 
   function create( {
     ctx,
@@ -14,6 +16,7 @@ window.PlayerSelect = ( () => {
     height,
     title,
     ranking,
+    players,
     nameMaxLength = 10,
     defaultName = 'ANÒNIM',
     onPlayerChosen
@@ -22,11 +25,30 @@ window.PlayerSelect = ( () => {
     let screen = 'list';
     let playerOptions = [];
     let selectedIndex = 0;
+    let scrollOffset = 0;            // índex de la primera fila visible de la llista
     let nameInput = '';
 
+    function optionCount() {
+      return playerOptions.length + 1;
+    }
+
+    function maxScrollOffset() {
+      return Math.max( 0, optionCount() - LIST_VISIBLE_ROWS );
+    }
+
+    // Desplaça la finestra el mínim necessari perquè la selecció es vegi
+    function ensureSelectionVisible() {
+      if ( selectedIndex < scrollOffset ) {
+        scrollOffset = selectedIndex;
+      } else if ( selectedIndex >= scrollOffset + LIST_VISIBLE_ROWS ) {
+        scrollOffset = selectedIndex - LIST_VISIBLE_ROWS + 1;
+      }
+    }
+
     function enterList() {
-      playerOptions = ranking.playerNames();
+      playerOptions = players.names;
       selectedIndex = 0;
+      scrollOffset = 0;
       nameInput = '';
       screen = 'list';
     }
@@ -37,7 +59,7 @@ window.PlayerSelect = ( () => {
     }
 
     function start() {
-      if ( ranking.isEmpty() ) {
+      if ( players.isEmpty() ) {
         enterName();
       } else {
         enterList();
@@ -46,7 +68,7 @@ window.PlayerSelect = ( () => {
 
     function confirmSelection() {
       if ( selectedIndex < playerOptions.length ) {
-        onPlayerChosen( playerOptions[ selectedIndex ] );
+        onPlayerChosen( players.register( playerOptions[ selectedIndex ] ) );
       } else {
         enterName();
       }
@@ -56,7 +78,8 @@ window.PlayerSelect = ( () => {
       if ( x < listLeft || x > listLeft + LIST_WIDTH ) return -1;
       const firstRowTop = LIST_HEADER_Y + LIST_ROW_HEIGHT / 2;
       const row = Math.floor( ( y - firstRowTop ) / LIST_ROW_HEIGHT );
-      return row >= 0 && row <= playerOptions.length ? row : -1;
+      const visibleRows = Math.min( LIST_VISIBLE_ROWS, optionCount() - scrollOffset );
+      return row >= 0 && row < visibleRows ? scrollOffset + row : -1;
     }
 
     function drawList() {
@@ -77,9 +100,10 @@ window.PlayerSelect = ( () => {
       ctx.fillText( 'Jugadors', listLeft, LIST_HEADER_Y );
 
       ctx.font = '18px monospace';
-      for ( let i = 0; i <= playerOptions.length; i++ ) {
+      const lastVisible = Math.min( optionCount(), scrollOffset + LIST_VISIBLE_ROWS ) - 1;
+      for ( let i = scrollOffset; i <= lastVisible; i++ ) {
         const isNewPlayer = i === playerOptions.length;
-        const y = LIST_HEADER_Y + ( i + 1 ) * LIST_ROW_HEIGHT;
+        const y = LIST_HEADER_Y + ( i - scrollOffset + 1 ) * LIST_ROW_HEIGHT;
         const selected = i === selectedIndex;
         if ( selected ) {
           ctx.fillStyle = 'rgba(255, 235, 59, 0.2)';
@@ -88,6 +112,17 @@ window.PlayerSelect = ( () => {
         ctx.fillStyle = selected ? '#ffeb3b' : ( isNewPlayer ? '#aaa' : '#fff' );
         ctx.textAlign = 'left';
         ctx.fillText( ( selected ? '> ' : '  ' ) + ( isNewPlayer ? NEW_PLAYER_LABEL : playerOptions[ i ] ), listLeft, y );
+      }
+
+      // Indicadors de files amagades: ▲ a la capçalera, ▼ sota l'última fila visible
+      ctx.fillStyle = SCROLL_INDICATOR_COLOR;
+      ctx.textAlign = 'right';
+      const indicatorX = listLeft + LIST_WIDTH - 16;
+      if ( scrollOffset > 0 ) {
+        ctx.fillText( '▲', indicatorX, LIST_HEADER_Y );
+      }
+      if ( scrollOffset < maxScrollOffset() ) {
+        ctx.fillText( '▼', indicatorX, LIST_HEADER_Y + ( LIST_VISIBLE_ROWS + 1 ) * LIST_ROW_HEIGHT );
       }
 
       ctx.fillStyle = '#fff';
@@ -113,19 +148,21 @@ window.PlayerSelect = ( () => {
 
       ctx.font = '16px sans-serif';
       ctx.fillText( 'Prem Enter per començar', width / 2, height / 2 + 80 );
-      if ( !ranking.isEmpty() ) {
+      if ( !players.isEmpty() ) {
         ctx.fillText( 'Esc per tornar', width / 2, height / 2 + 108 );
       }
     }
 
     function handleListKey( e ) {
-      const optionCount = playerOptions.length + 1;
+      const count = optionCount();
       if ( e.key === 'ArrowUp' ) {
         e.preventDefault();
-        selectedIndex = ( selectedIndex - 1 + optionCount ) % optionCount;
+        selectedIndex = ( selectedIndex - 1 + count ) % count;
+        ensureSelectionVisible();
       } else if ( e.key === 'ArrowDown' ) {
         e.preventDefault();
-        selectedIndex = ( selectedIndex + 1 ) % optionCount;
+        selectedIndex = ( selectedIndex + 1 ) % count;
+        ensureSelectionVisible();
       } else if ( e.key === 'Enter' ) {
         e.preventDefault();
         confirmSelection();
@@ -134,13 +171,13 @@ window.PlayerSelect = ( () => {
 
     function handleNameKey( e ) {
       if ( e.key === 'Escape' ) {
-        if ( !ranking.isEmpty() ) enterList();
+        if ( !players.isEmpty() ) enterList();
       } else if ( e.key === 'Backspace' ) {
         e.preventDefault();
         nameInput = nameInput.slice( 0, -1 );
       } else if ( e.key === 'Enter' ) {
         e.preventDefault();
-        onPlayerChosen( nameInput.trim() || defaultName );
+        onPlayerChosen( players.register( nameInput.trim() || defaultName ) );
       } else if ( e.key === ' ' ) {
         e.preventDefault();
         if ( nameInput.length > 0 && nameInput.length < nameMaxLength ) {
@@ -175,6 +212,14 @@ window.PlayerSelect = ( () => {
         if ( row === -1 ) return;
         selectedIndex = row;
         confirmSelection();
+      },
+      // Desplaça la llista una fila per pas sense canviar la selecció.
+      // Retorna true si l'event s'ha consumit (llista de jugadors)
+      handleWheel( deltaY ) {
+        if ( screen !== 'list' ) return false;
+        const step = Math.sign( deltaY );
+        scrollOffset = Math.min( maxScrollOffset(), Math.max( 0, scrollOffset + step ) );
+        return true;
       }
     };
   }

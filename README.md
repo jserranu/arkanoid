@@ -11,6 +11,7 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
 - `shared/` — codi comú, carregat amb `<script>` clàssics:
   - `games.js` — llista de jocs del menú i configuració del rànquing de cadascun (`window.GAMES`).
   - `ranking.js` — rànquing Top N persistent a `localStorage` (`window.Ranking`).
+  - `players.js` — llista de jugadors comuna a tots els jocs, persistent a `localStorage` (`window.Players`).
   - `player-select.js` — pantalles de selecció de jugador i entrada del nom al canvas (`window.PlayerSelect`).
 
 ## Controls de l'Arkanoid
@@ -21,7 +22,7 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
 - **P** o **Escape** per posar el joc en pausa; **Espai** o **Enter** per continuar.
 - **Espai** o **clic de ratolí** per disparar la pilota quan està enganxada a la pala (power-up magnètic).
 - Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú de jocs.
-- A la pantalla inicial: **fletxes amunt/avall** i **Enter** (o el **ratolí**) per triar jugador; **Escape** per tornar a la selecció des de l'entrada de nom.
+- A la pantalla inicial: **fletxes amunt/avall** i **Enter** (o el **ratolí**) per triar jugador (la llista es desplaça amb les fletxes o la **roda del ratolí** quan hi ha més d'11 files); **Escape** per tornar a la selecció des de l'entrada de nom.
 
 ## Funcionalitats de l'Arkanoid
 
@@ -37,7 +38,7 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
   - **Estrella verda**: suma una vida extra.
   - **Estrella blava**: durant 30 s la pilota va ×1.5 més ràpida i s'enganxa a la pala; es dispara amb Espai o clic.
 - Pausa del joc amb P o Escape.
-- Nom de jugador i rànquing Top 10 persistent a `localStorage`, amb selecció de jugador a la pantalla inicial.
+- Nom de jugador i rànquing Top 10 persistent a `localStorage`, amb selecció de jugador a la pantalla inicial. Els jugadors són comuns a tots els jocs: un jugador creat a un joc apareix a la selecció dels altres.
 - Puntuació i vides, amb estats de victòria (per nivell i final) i derrota.
 
 ## Starship
@@ -47,7 +48,7 @@ Jocs fets amb HTML5 Canvas i JavaScript pur, sense dependències ni eines de bui
 - **P** o **Escape** per posar el joc en pausa; **Espai** o **Enter** per continuar o per passar de nivell.
 - Botó **Jocs** (amb el ratolí) a la pausa i a les pantalles finals per tornar al menú.
 
-Els asteroides cauen en vertical o en diagonal; en disparar-los, els grans es divideixen en 2 mitjans i els mitjans en 2 petits (20/50/100 punts). 3 vides: es perd una vida quan un asteroide toca la nau. 5 nivells de 60 s, cada un amb més asteroides i més ràpids. Selecció de jugador i rànquing Top 10 propis, com a l'Arkanoid.
+Els asteroides cauen en vertical o en diagonal; en disparar-los, els grans es divideixen en 2 mitjans i els mitjans en 2 petits (20/50/100 punts). 3 vides: es perd una vida quan un asteroide toca la nau. 5 nivells de 60 s, cada un amb més asteroides i més ràpids. Rànquing Top 10 propi i la mateixa selecció de jugador que l'Arkanoid.
 
 ## Puntuacions
 
